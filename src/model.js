@@ -6,7 +6,7 @@ export function addDays(date, amount) {
   return d.toISOString().slice(0, 10);
 }
 export const weekday = date => new Date(`${date}T12:00:00Z`).getUTCDay();
-export const weekStart = date => addDays(date, -((weekday(date) + 6) % 7));
+export const weekStart = (date, startsOn = 1) => addDays(date, -((weekday(date) - startsOn + 7) % 7));
 export const minutes = time => Number(time.split(':')[0]) * 60 + Number(time.split(':')[1]);
 export const timeString = n => `${String(Math.floor(n / 60)).padStart(2, '0')}:${String(n % 60).padStart(2, '0')}`;
 export function todayInZone(zone) {
