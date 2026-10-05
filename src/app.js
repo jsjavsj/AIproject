@@ -77,6 +77,8 @@ function sidebar() {
   <div class="sidebar-bottom"><div class="gentle-note">${icon('leaf')}<strong>Progress, at your pace.</strong><p>Make a little room for yourself, too.</p></div><button class="nav-item" data-action="settings">${icon('settings')}<span>Settings & data</span></button><div class="profile"><span class="avatar">S</span><div><strong>Student workspace</strong><small>Personal planner</small></div><span class="online-dot"></span></div></div></aside>`;
 }
 function render() {
+  const previousScroll = app.querySelector('.calendar-scroll');
+  const scrollHour = previousScroll ? previousScroll.scrollTop / parseFloat(getComputedStyle(previousScroll).getPropertyValue('--hour-height')) : 8;
   state.layout = normalizeLayout(state.layout);
   document.documentElement.dataset.accent = state.layout.accent;
   document.documentElement.dataset.density = state.layout.density;
@@ -93,19 +95,21 @@ function render() {
   <div class="planner-layout ${page !== 'calendar' ? 'alternate-page' : ''}"><section class="calendar-card">${page === 'calendar' ? calendar() : page === 'tasks' ? taskPage() : overview()}</section><aside class="right-panel" aria-label="Tasks and upcoming class">${rightPanel(active, done)}</aside></div>
   <footer class="page-footer"><span>${icon('sun')} A plan for your day. Space for your life.</span><span>${esc(state.timezone)} · Browser-local storage</span></footer></div></main>`;
   bindDrag();
+  const calendarScroll = app.querySelector('.calendar-scroll');
+  if (calendarScroll) calendarScroll.scrollTop = scrollHour * hourHeight();
 }
 function calendar() {
   const start = weekStart(selected), end = addDays(start, 6);
   const title = view === 'day' ? formatDate(selected, { month: 'long', day: 'numeric', year: 'numeric' }) : formatDate(selected, { month: 'long', year: 'numeric' });
   return `<div class="calendar-toolbar"><div class="calendar-title"><h2>${title}</h2><span class="week-badge">${view === 'week' ? `${formatDate(start)} – ${formatDate(end)}` : view === 'day' ? formatDate(selected, { weekday: 'long' }) : 'Your month at a glance'}</span></div><div class="calendar-controls"><button class="button quiet today-button" data-action="today">Today</button><button class="icon-button" data-action="prev" aria-label="Previous ${view}">${icon('chevron', 'flip')}</button><button class="icon-button" data-action="next" aria-label="Next ${view}">${icon('chevron')}</button></div></div><div class="view-toolbar"><div class="segmented" aria-label="Calendar view">${['day', 'week', 'month'].map(v => `<button data-action="view" data-view="${v}" class="${view === v ? 'active' : ''}" aria-pressed="${view === v}">${v[0].toUpperCase() + v.slice(1)}</button>`).join('')}</div><span class="calendar-hint">${icon('plus')} Click a time to make a plan</span></div>
   ${view === 'month' ? monthCalendar() : timeCalendar(view === 'day' ? [selected] : Array.from({ length: 7 }, (_, i) => addDays(start, i)))}
-  <div class="mobile-agenda"><div class="mobile-days">${Array.from({ length: 7 }, (_, i) => { const d = addDays(weekStart(selected), i); return `<button data-action="date" data-date="${d}" class="${d === selected ? 'selected' : ''}" aria-label="${formatDate(d, { dateStyle: 'full' })}"><small>${formatDate(d, { weekday: 'short' })}</small><span>${Number(d.slice(-2))}</span></button>`; }).join('')}</div>${agenda(selected)}</div><div class="calendar-bottom"><span><i class="tiny-dot"></i> A little planning goes a long way</span><span>Drag to move · Pull an event’s bottom edge to resize</span></div>`;
+  <div class="mobile-agenda"><div class="mobile-days">${Array.from({ length: 7 }, (_, i) => { const d = addDays(weekStart(selected), i); return `<button data-action="date" data-date="${d}" class="${d === selected ? 'selected' : ''}" aria-label="${formatDate(d, { dateStyle: 'full' })}"><small>${formatDate(d, { weekday: 'short' })}</small><span>${Number(d.slice(-2))}</span></button>`; }).join('')}</div>${agenda(selected)}</div><div class="calendar-bottom"><span><i class="tiny-dot"></i> Full 24-hour day · Scroll up or down for more times</span><span>Drag to move · Pull an event’s bottom edge to resize</span></div>`;
 }
 function timeCalendar(dates) {
   const everyEvent = getEvents(dates[0], dates.at(-1));
   const all = everyEvent.filter(e => !e.allDay);
-  const firstHour = Math.min(8, ...all.map(e => Math.floor(minutes(e.start) / 60)));
-  const lastHour = Math.max(19, ...all.map(e => Math.ceil(minutes(e.end) / 60)));
+  const firstHour = 0;
+  const lastHour = 24;
   const height = (lastHour - firstHour) * hourHeight();
   const nowParts = new Intl.DateTimeFormat('en-GB', { timeZone: state.timezone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date());
   const nowMinute = minutes(nowParts);
