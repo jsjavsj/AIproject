@@ -1,0 +1,56 @@
+// Run in the local test browser with: agent-browser eval --stdin < tests/browser-flow.js
+// This exercises the real forms and storage. Use a disposable browser profile.
+(async () => {
+  const { occurrences } = await import('/src/model.js');
+  const read = () => JSON.parse(localStorage.getItem('daylight-planner-v1'));
+  const click = selector => { const el = document.querySelector(selector); if (!el) throw Error(`Missing control: ${selector}`); el.click(); };
+  const fill = (name, value) => { const el = document.querySelector(`#editor [name="${name}"]`); el.value = value; el.dispatchEvent(new Event('change', { bubbles: true })); };
+  const submit = () => document.querySelector('#editor form').requestSubmit();
+  const assert = (value, message) => { if (!value) throw Error(message); };
+  const results = [];
+  document.querySelector('#editor').close();
+  click('[data-action="add"]'); click('[data-action="new-event"]');
+  fill('title', 'QA weekly academy'); fill('date', '2026-10-05'); fill('start', '18:00'); fill('end', '19:00');
+  click('[name="repeat"]'); fill('until', '2026-12-31'); submit();
+  assert(!document.querySelector('#editor').open, 'Create class failed');
+  let event = read().events.find(e => e.title === 'QA weekly academy');
+  assert(event?.repeat && event.days.includes(1), 'Weekly recurrence not saved');
+  results.push('Create weekly academy class');
+  click(`[data-action="event"][data-key="${event.id}:2026-10-05"]`);
+  fill('date', '2026-10-06'); fill('start', '18:00'); fill('end', '19:00'); submit();
+  let list = occurrences(read().events.filter(e => e.id === event.id), '2026-10-05', '2026-10-19');
+  assert(list[0].date === '2026-10-06' && list[1].date === '2026-10-12', 'Single reschedule changed the recurring schedule');
+  results.push('Reschedule one occurrence without moving the series');
+  click('[data-action="next"]');
+  click(`[data-action="event"][data-key="${event.id}:2026-10-12"]`);
+  fill('scope', 'future'); fill('start', '19:00'); fill('end', '20:00'); submit();
+  list = occurrences(read().events.filter(e => e.title === 'QA weekly academy'), '2026-10-05', '2026-10-26');
+  assert(list[0].start === '18:00' && list.slice(1).every(e => e.start === '19:00'), 'Future edit changed the past');
+  results.push('Edit future classes and preserve the earlier exception');
+  click('[data-action="new-task"]');
+  fill('title', 'QA chemistry homework'); fill('subject', 'Chemistry'); fill('deadline', '2026-10-15'); fill('duration', '90'); submit();
+  let task = read().tasks.find(t => t.title === 'QA chemistry homework');
+  assert(task && !task.done, 'Task not saved');
+  click(`[data-action="schedule-task"][data-id="${task.id}"]`);
+  fill('date', '2026-10-13'); fill('start', '17:00'); fill('end', '17:45'); submit();
+  click(`[data-action="schedule-task"][data-id="${task.id}"]`);
+  fill('date', '2026-10-14'); fill('start', '17:00'); fill('end', '17:45'); submit();
+  assert(read().events.filter(e => e.taskId === task.id).length === 2, 'Task was not split into two sessions');
+  assert(read().tasks.find(t => t.id === task.id).deadline === '2026-10-15', 'Scheduling changed the task deadline');
+  results.push('Create homework and split into two study sessions');
+  click(`[data-action="complete"][data-id="${task.id}"]`);
+  assert(read().tasks.find(t => t.id === task.id).done, 'Task completion did not persist');
+  results.push('Complete the homework task');
+  click('[data-action="add"]'); click('[data-action="new-event"]');
+  fill('title', 'QA overlap'); fill('date', '2026-10-13'); fill('start', '17:15'); fill('end', '17:45'); submit();
+  assert(document.querySelector('#conflict-warning').textContent.includes('overlap'), 'Overlap warning not displayed');
+  click('[data-action="save-overlap"]');
+  const overlap = [...document.querySelectorAll('.calendar-event')].filter(el => el.textContent.includes('QA'));
+  assert(overlap.some(el => el.style.width.includes('50%')), 'Overlapping sessions do not share columns');
+  results.push('Show overlap warning and side-by-side events');
+  click('[data-view="month"]'); assert(document.querySelectorAll('.month-cell').length === 42, 'Month view failed');
+  click('[data-view="day"]'); assert(document.querySelectorAll('.day-column').length === 1, 'Day view failed');
+  click('[data-view="week"]'); assert(document.querySelectorAll('.day-column').length === 7, 'Week view failed');
+  results.push('Switch between month, day, and week views');
+  return results;
+})()
