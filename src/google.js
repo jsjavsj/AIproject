@@ -21,17 +21,22 @@ export class GoogleConnection {
   }
   connected(service) { return !!this.sessions[service] && this.sessions[service].expires > this.now(); }
   account(service) { return this.connected(service) ? this.sessions[service].account : null; }
-  disconnect(service) { delete this.sessions[service]; }
+  disconnect(service) {
+    const session = this.sessions[service];
+    for (const [key, value] of Object.entries(this.sessions)) if (key === service || value === session) delete this.sessions[key];
+  }
   connect(service, clientId) {
+    const services = service === 'all' ? ['calendar', 'classroom'] : [service];
+    const scopes = [...new Set(services.flatMap(key => SCOPES[key]))];
     if (!validClientId(clientId)) return Promise.reject(Error('Set a Google OAuth web client ID in connection setup first.'));
     if (!globalThis.google?.accounts?.oauth2) return Promise.reject(Error('Google sign-in is still loading. Please try Connect again in a moment.'));
     return new Promise((resolve, reject) => {
       const client = google.accounts.oauth2.initTokenClient({
-        client_id: clientId, scope: ['openid', 'email', ...SCOPES[service]].join(' '), include_granted_scopes: true,
+        client_id: clientId, scope: ['openid', 'email', ...scopes].join(' '), include_granted_scopes: true,
         error_callback: error => reject(Error(error.type === 'popup_closed' ? 'Sign-in was cancelled. Your existing plans are unchanged.' : 'Google could not open sign-in. Allow popups for this website and try again.')),
         callback: async response => {
           if (response.error) { reject(Error('Google access was not granted. Please connect again and allow the requested read access.')); return; }
-          if (!google.accounts.oauth2.hasGrantedAllScopes(response, ...SCOPES[service])) { reject(Error('Some required permissions were declined. Connect again and allow read access to the selected service.')); return; }
+          if (!google.accounts.oauth2.hasGrantedAllScopes(response, ...scopes)) { reject(Error('Some required permissions were declined. Sign in again and allow read access to both Calendar and Classroom.')); return; }
           const session = { token: response.access_token, expires: this.now() + Math.max(0, Number(response.expires_in) - 60) * 1000 };
           try {
             const result = await this.fetcher('https://www.googleapis.com/oauth2/v3/userinfo', { headers: { Authorization: `Bearer ${session.token}` }, signal: AbortSignal.timeout(20000) });
@@ -39,7 +44,8 @@ export class GoogleConnection {
             const profile = await result.json();
             if (!profile.sub) throw Error('Google did not return an account identifier. Please reconnect.');
             session.account = { id: profile.sub, email: profile.email || 'Google account' };
-            this.sessions[service] = session; resolve(session.account);
+            for (const key of services) this.sessions[key] = session;
+            resolve(session.account);
           } catch (error) { reject(error); }
         },
       });

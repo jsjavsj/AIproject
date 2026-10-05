@@ -19,8 +19,10 @@
   click('.layout-shortcut'); click('[data-tab="connections"]');
   assert(document.querySelector('[data-action="google-connect"]').disabled, 'Unconfigured connection should be disabled');
   click('.connection-setup summary'); fill('clientId', '123-fixture.apps.googleusercontent.com'); submit();
-  click('[data-action="google-connect"][data-service="calendar"]');
-  await waitFor(() => document.querySelector('[data-source="calendar"]'));
+  click('[data-action="google-connect"]');
+  await waitFor(() => document.querySelector('[data-source="calendar"]') && document.querySelector('[data-source="classroom"]'));
+  assert(window.__googleFixture.signIns === 1, 'Both services should share one sign-in');
+  assert(window.__googleFixture.scopes.includes('calendar.events.readonly') && window.__googleFixture.scopes.includes('classroom.coursework.me.readonly'), 'Combined permission request is incomplete');
   click('[data-action="google-sync"][data-service="calendar"]');
   await waitFor(() => read().events.some(e => e.remote?.service === 'calendar'));
   const ids = read().events.filter(e => e.remote).map(e => e.id);
@@ -29,8 +31,7 @@
   assert(JSON.stringify(read().events.filter(e => e.remote).map(e => e.id)) === JSON.stringify(ids), 'Repeated sync duplicated events');
   assert(document.querySelector('.all-day-event')?.textContent === 'School holiday', 'All-day event is not in its own row');
   results.push('Calendar account, source selection, timed/all-day import, and deduplication');
-  click('[data-action="google-connect"][data-service="classroom"]');
-  await waitFor(() => document.querySelector('[data-source="classroom"]'));
+  assert(document.querySelector('[data-source="classroom"]'), 'Classroom did not connect with the same sign-in');
   click('[data-action="google-sync"][data-service="classroom"]');
   await waitFor(() => read().tasks.some(t => t.remote?.service === 'classroom'));
   const task = read().tasks.find(t => t.remote?.service === 'classroom');
@@ -51,8 +52,14 @@
   await waitFor(() => !read().events.some(e => e.remote?.service === 'calendar'));
   assert(read().events.some(e => !e.remote), 'Google refresh removed personal events');
   results.push('Google deletions remove imports without removing local plans');
-  click('[data-action="google-disconnect"][data-service="classroom"]');
-  assert(document.querySelector('[data-action="google-connect"][data-service="classroom"]'), 'Disconnect failed');
-  results.push('Disconnect returns to reconnect state');
+  window.__googleFixture.accountId = 'another-account'; window.__googleFixture.email = 'another@example.test';
+  click('[data-action="google-connect"]');
+  await waitFor(() => document.querySelector('.google-account-card').textContent.includes('another@example.test') && !document.querySelector('[data-action="google-connect"]').disabled);
+  assert(!read().tasks.some(t => t.remote?.account === 'fixture-account'), 'Account switch retained previous account imports');
+  assert(read().tasks.some(t => !t.remote), 'Account switch removed personal tasks');
+  results.push('Account switching replaces both connections and clears only previous account imports');
+  click('[data-action="google-signout"]');
+  assert(!document.querySelector('[data-source]'), 'Sign out did not disconnect both services');
+  results.push('One sign-out disconnects Calendar and Classroom');
   return results;
 })()

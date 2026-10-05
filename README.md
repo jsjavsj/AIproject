@@ -37,7 +37,9 @@ Push the source files to the GitHub repository and import it into Vercel. Use th
 2. Configure Google Auth Platform and add test users for a competition demo in Testing mode.
 3. Create a **Web application** OAuth client. Authorize your exact Vercel origin and `http://localhost:5173` / `http://127.0.0.1:5173` for local testing.
 4. Set `GOOGLE_CLIENT_ID` in Vercel and redeploy. For local testing, save the public ID in **Customize → Connections → Website owner setup**.
-5. Connect each service, choose calendars/courses, and select **Sync selected**.
+5. Select **Google sign-in → Sign in with Google**, choose one Google account, and grant read access to both Calendar and Classroom. Select calendars/courses and use **Sync selected** in each section.
+
+A single permission flow connects both services to the same verified Google account. Switching accounts replaces both connections and clears the previous account's imported copies, while retaining personal plans. One **Sign out** button clears both in-memory connections; imported copies remain available in the browser until removed or replaced on an account switch. Denied permissions do not establish a partially connected new account.
 
 The website includes [detailed instructions and troubleshooting](google-setup.html). Google may require app verification before public use; school administrators may restrict third-party app access. This integration uses the official [Google Identity Services browser token model](https://developers.google.com/identity/oauth2/web/guides/use-token-model). It requires read-only Calendar and Classroom scopes plus `openid` and `email` for account identity. It does not need an API key or client secret.
 

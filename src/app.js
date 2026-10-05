@@ -88,7 +88,7 @@ function render() {
   const done = state.tasks.filter(t => t.done).length, active = state.tasks.filter(t => !t.done);
   const week = occurrences(state.events, weekStart(selected), addDays(weekStart(selected), 6));
   const hours = week.reduce((n, e) => n + (e.allDay ? 0 : minutes(e.end) - minutes(e.start)), 0) / 60;
-  app.innerHTML = `${sidebar()}<main class="main"><header class="topbar"><div class="breadcrumb">My workspace <span>/</span> <strong>${page === 'calendar' ? 'My calendar' : page === 'tasks' ? 'My tasks' : 'Overview'}</strong></div><div class="topbar-right"><button class="button quiet layout-shortcut" data-action="settings">${icon('settings')}<span>Customize</span></button><span class="local-badge"><span></span>${storageIssue ? 'Changes need a backup' : 'Saved on this device'}</span><button class="avatar small" data-action="settings" aria-label="Open settings and backups">S</button></div></header>
+  app.innerHTML = `${sidebar()}<main class="main"><header class="topbar"><div class="breadcrumb">My workspace <span>/</span> <strong>${page === 'calendar' ? 'My calendar' : page === 'tasks' ? 'My tasks' : 'Overview'}</strong></div><div class="topbar-right"><button class="button quiet layout-shortcut" data-action="settings">${icon('settings')}<span>Customize</span></button><button class="button quiet google-account-shortcut" data-action="settings-tab" data-tab="connections">${googleConnection.account('calendar') || googleConnection.account('classroom') ? 'Google account' : 'Google sign-in'}</button><span class="local-badge"><span></span>${storageIssue ? 'Changes need a backup' : 'Saved on this device'}</span><button class="avatar small" data-action="settings" aria-label="Open settings and backups">S</button></div></header>
   <div class="main-content"><section class="page-heading"><div><div class="eyebrow">A LITTLE STRUCTURE. A LOT OF POSSIBILITY.</div><h1>${page === 'calendar' ? 'Make space for your day' : page === 'tasks' ? 'Small steps. Real progress.' : 'Your day, a little clearer.'}<span class="heading-sun">${icon('sun')}</span></h1><p>Classes, goals, and everything in between. You’ve got this.</p></div><button class="button primary" data-action="add">${icon('plus')}<span>Add new</span></button></section>
   ${storageIssue ? `<div class="warning">${esc(storageIssue)}</div>` : ''}
   <section class="stats"><div class="stat"><span class="stat-icon lavender">${icon('calendar')}</span><div><small>This week</small><strong>${week.length} <span>planned sessions</span></strong></div><span class="stat-note">Let’s make it a good one</span></div><div class="stat"><span class="stat-icon mint">${icon('check')}</span><div><small>Making progress</small><strong>${done}<span> / ${state.tasks.length} tasks complete</span></strong></div><div class="mini-progress" style="--progress:${state.tasks.length ? done / state.tasks.length * 100 : 0}%"></div></div><div class="stat"><span class="stat-icon peach">${icon('clock')}</span><div><small>Time planned</small><strong>${Number(hours.toFixed(1))}<span> hours this week</span></strong></div></div></section>
@@ -217,9 +217,12 @@ function showSettings(tab = 'layout') {
 }
 function showConnections() {
   const configured = validClientId(clientId());
+  const account = googleConnection.account('calendar') || googleConnection.account('classroom');
+  const busy = Object.values(connectionUI).some(ui => ui.busy);
   openDialog(`${dialogHeader('Bring your plans together', 'Your classes and commitments, in one calm place.')}${settingsTabs('connections')}
     <div class="connection-intro">Read-only imports. Your Google events and assignments are never changed by Daylight.</div>
     ${!configured ? `<div class="setup-callout"><strong>One-time Google setup needed</strong><p>The website owner needs to create a Google OAuth client ID. After setup, each student connects their own Google account.</p><a href="/google-setup.html" target="_blank" rel="noopener" class="button quiet">Open setup guide ${icon('arrow')}</a></div>` : ''}
+    <section class="google-account-card"><h3>${account ? 'Your Google account' : 'One account. Both connections.'}</h3><p>${account ? esc(account.email) : 'Sign in once and allow Daylight to read this account’s Calendar events and Classroom assignments.'}</p><div class="connection-actions"><button class="button quiet google-signin" data-action="google-connect" ${!configured || busy ? 'disabled' : ''}><span aria-hidden="true" class="google-letter">G</span>${busy ? 'Please wait…' : account ? 'Switch Google account' : 'Sign in with Google'}</button>${account ? `<button class="text-button" data-action="google-signout" ${busy ? 'disabled' : ''}>Sign out</button>` : ''}</div><small>Google asks for your permission. Sign-in does not provide cloud backup of your Daylight plans.</small></section>
     ${['calendar', 'classroom'].map(service => connectionCard(service, configured)).join('')}
     <details class="connection-setup"><summary>Website owner setup</summary><p>For production, set GOOGLE_CLIENT_ID in Vercel and redeploy. For local testing, you can save a public client ID below. Never enter a client secret.</p><form id="google-config-form"><label>Google OAuth web client ID<input name="clientId" value="${esc(clientId())}" placeholder="123456-example.apps.googleusercontent.com" ${globalThis.DAYLIGHT_CONFIG?.googleClientId ? 'readonly' : ''} required /></label><button class="button quiet" ${globalThis.DAYLIGHT_CONFIG?.googleClientId ? 'disabled' : ''}>Save test client ID</button><div class="form-error" role="alert"></div></form><a href="/google-setup.html" target="_blank" rel="noopener">Read the complete setup guide ↗</a></details>
     <p class="field-note connection-privacy">Access tokens stay in memory and expire. Reconnect after refreshing this page. Imported items stay in this browser until refreshed or removed. <a href="https://myaccount.google.com/connections" target="_blank" rel="noopener">Manage Google permissions ↗</a></p>`);
@@ -238,7 +241,7 @@ function connectionCard(service, configured) {
     ${connected && ui.items ? `<fieldset class="source-picker"><legend>${isCalendar ? 'Choose calendars' : 'Choose courses'}</legend>${list.length ? list.map(item => `<label><input type="checkbox" data-source="${service}" value="${esc(item.id)}" ${(meta.selectedIds || []).includes(item.id) ? 'checked' : ''} ${busy ? 'disabled' : ''}/><span>${esc(item.summary || item.name)}${item.primary ? ' <small>Primary</small>' : ''}</span></label>`).join('') : `<p>No ${isCalendar ? 'calendars' : 'active enrolled courses'} were found for this account.</p>`}</fieldset>` : ''}
     ${isCalendar ? `<p class="field-note">Imports the previous 30 days and next 180 days. Sync replaces this Google snapshot; your own plans stay.</p>` : `<p class="field-note">Completion is your personal checklist, not submission status. Turn in work in Classroom.</p>`}
     ${ui.error ? `<p class="form-error" role="alert">${esc(ui.error)}</p>` : ''}${ui.notice ? `<p class="sync-success" role="status">${esc(ui.notice)}</p>` : ''}
-    <div class="connection-actions">${connected ? `<button class="button primary" data-action="google-sync" data-service="${service}" ${busy || !list.length ? 'disabled' : ''}>${busy ? esc(ui.busy) : 'Sync selected'}</button><button class="button quiet" data-action="google-sources" data-service="${service}" ${busy ? 'disabled' : ''}>Refresh list</button><button class="text-button" data-action="google-disconnect" data-service="${service}" ${busy ? 'disabled' : ''}>Disconnect</button>` : `<button class="button primary" data-action="google-connect" data-service="${service}" ${!configured || busy ? 'disabled' : ''}>${busy ? esc(ui.busy) : 'Connect Google ' + (isCalendar ? 'Calendar' : 'Classroom')}</button>`}${count ? `<button class="text-button danger-text" data-action="google-remove" data-service="${service}" ${busy ? 'disabled' : ''}>Remove imports</button>` : ''}</div></section>`;
+    <div class="connection-actions">${connected ? `<button class="button primary" data-action="google-sync" data-service="${service}" ${busy || !list.length ? 'disabled' : ''}>${busy ? esc(ui.busy) : 'Sync selected'}</button><button class="button quiet" data-action="google-sources" data-service="${service}" ${busy ? 'disabled' : ''}>Refresh list</button>` : `<span class="field-note">${busy ? esc(ui.busy) : 'Use Google sign-in above to connect both services.'}</span>`}${count ? `<button class="text-button danger-text" data-action="google-remove" data-service="${service}" ${busy ? 'disabled' : ''}>Remove imports</button>` : ''}</div></section>`;
 }
 function refreshConnections() { if (dialog.open && dialog.dataset.settingsTab === 'connections') showConnections(); }
 async function loadSources(service) {
@@ -250,14 +253,28 @@ async function loadSources(service) {
   state.connections[service] = { ...(sameAccount ? old : {}), accountId: account.id, email: account.email, selectedIds };
   save();
 }
-async function connectGoogle(service) {
-  const ui = connectionUI[service]; if (ui.busy) return;
-  ui.error = ''; ui.notice = ''; ui.busy = 'Connecting…';
+async function connectGoogle() {
+  const services = ['calendar', 'classroom'];
+  if (services.some(service => connectionUI[service].busy)) return;
+  for (const service of services) Object.assign(connectionUI[service], { error: '', notice: '', busy: 'Connecting…' });
   // Start OAuth before any await or re-render so the popup belongs to the click.
-  const promise = googleConnection.connect(service, clientId()); refreshConnections();
-  try { await promise; await loadSources(service); ui.notice = 'Choose what to import, then select Sync selected.'; }
-  catch (error) { ui.error = error.message; }
-  finally { ui.busy = ''; refreshConnections(); }
+  const promise = googleConnection.connect('all', clientId()); refreshConnections();
+  try {
+    const account = await promise;
+    // Switching accounts removes only previous accounts' imported copies; personal plans remain.
+    state.events = state.events.filter(item => !item.remote || item.remote.account === account.id);
+    state.tasks = state.tasks.filter(item => !item.remote || item.remote.account === account.id);
+    for (const service of services) delete connectionUI[service].items;
+    await Promise.all(services.map(async service => {
+      try { await loadSources(service); connectionUI[service].notice = 'Choose what to import, then select Sync selected.'; }
+      catch (error) {
+        connectionUI[service].error = error.message;
+        if (state.connections[service]?.accountId !== account.id) state.connections[service] = { accountId: account.id, email: account.email, selectedIds: [] };
+      }
+    }));
+    save(); render();
+  } catch (error) { for (const service of services) connectionUI[service].error = error.message; }
+  finally { for (const service of services) connectionUI[service].busy = ''; refreshConnections(); }
 }
 async function syncGoogle(service, sourcesOnly = false) {
   const ui = connectionUI[service]; if (ui.busy) return;
@@ -361,10 +378,10 @@ document.addEventListener('click', e => {
   } else if (action === 'settings') showSettings();
   else if (action === 'settings-tab') showSettings(button.dataset.tab);
   else if (action === 'layout-reset') { state.layout = { ...DEFAULT_LAYOUT }; view = state.layout.defaultView; commit('Layout reset. Your plans are unchanged.'); showSettings('layout'); }
-  else if (action === 'google-connect') connectGoogle(button.dataset.service);
+  else if (action === 'google-connect') connectGoogle();
+  else if (action === 'google-signout') { if (Object.values(connectionUI).some(ui => ui.busy)) return; for (const service of ['calendar', 'classroom']) { googleConnection.disconnect(service); connectionUI[service] = {}; } render(); refreshConnections(); toast('Signed out of Daylight’s Google connections. Imported copies remain in this browser.'); }
   else if (action === 'google-sync') syncGoogle(button.dataset.service);
   else if (action === 'google-sources') syncGoogle(button.dataset.service, true);
-  else if (action === 'google-disconnect') { const service = button.dataset.service; googleConnection.disconnect(service); connectionUI[service] = {}; refreshConnections(); toast('Disconnected in this browser. Imported items are kept.'); }
   else if (action === 'google-remove') {
     const service = button.dataset.service;
     if (confirm('Remove these Google imports from Daylight? Your Google data and your own plans will stay.')) {

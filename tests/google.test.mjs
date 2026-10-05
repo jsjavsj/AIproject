@@ -93,6 +93,29 @@ test('partial Google consent is rejected', async () => {
 test('client configuration accepts only public client IDs', () => {
   assert.equal(validClientId('123-test.apps.googleusercontent.com'), true); assert.equal(validClientId('GOCSPX-secret'), false);
 });
+test('one Google sign-in grants both services to the same verified account', async () => {
+  const previous = globalThis.google; let requestedScope = '', popups = 0;
+  globalThis.google = { accounts: { oauth2: {
+    hasGrantedAllScopes: (_response, ...scopes) => scopes.includes('https://www.googleapis.com/auth/calendar.events.readonly') && scopes.includes('https://www.googleapis.com/auth/classroom.coursework.me.readonly'),
+    initTokenClient: options => { requestedScope = options.scope; return { requestAccessToken: () => { popups++; options.callback({ access_token: 'fixture', expires_in: 3600 }); } }; },
+  } } };
+  try {
+    const api = new GoogleConnection({ fetcher: async () => ({ ok: true, json: async () => ({ sub: 'student-a', email: 'student@example.test' }) }) });
+    await api.connect('all', '123-fixture.apps.googleusercontent.com');
+    assert.equal(popups, 1); assert.equal(api.account('calendar').id, 'student-a'); assert.equal(api.account('classroom').id, 'student-a');
+    assert.equal(api.sessions.calendar, api.sessions.classroom);
+    assert.ok(requestedScope.includes('classroom.courses.readonly'));
+  } finally { globalThis.google = previous; }
+});
+test('declining combined permissions cannot establish a partially connected new account', async () => {
+  const previous = globalThis.google;
+  globalThis.google = { accounts: { oauth2: { hasGrantedAllScopes: () => false, initTokenClient: options => ({ requestAccessToken: () => options.callback({ access_token: 'denied' }) }) } } };
+  try {
+    const api = new GoogleConnection();
+    await assert.rejects(api.connect('all', '123-fixture.apps.googleusercontent.com'), /both Calendar and Classroom/);
+    assert.equal(api.connected('calendar'), false); assert.equal(api.connected('classroom'), false);
+  } finally { globalThis.google = previous; }
+});
 test('layout preferences are validated and Sunday weeks cross month boundaries', () => {
   assert.deepEqual(normalizeLayout(null), normalizeLayout());
   assert.equal(normalizeLayout({ accent: 'invalid', density: 'compact', showTasks: false }).accent, 'indigo');
