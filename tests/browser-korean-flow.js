@@ -1,0 +1,47 @@
+// Run in the disposable agent-browser profile with google-browser-mock.js.
+(async () => {
+  const assert = (ok, message) => { if (!ok) throw Error(message); };
+  const click = selector => document.querySelector(selector).click();
+  const fill = (name, value) => { document.querySelector(`#editor [name="${name}"]`).value = value; };
+  const submit = () => document.querySelector('#editor form').requestSubmit();
+  const read = () => JSON.parse(localStorage.getItem('daylight-planner-v1'));
+  const waitFor = async check => { for (let i=0;i<100;i++) { if(check()) return; await new Promise(r=>setTimeout(r,30)); } throw Error('Timed out'); };
+  const language = value => { const input=document.querySelector('[data-language]'); input.value=value; input.dispatchEvent(new Event('change',{bubbles:true})); };
+  sessionStorage.setItem('qa-korean-original', JSON.stringify({ planner:localStorage.getItem('daylight-planner-v1'),language:localStorage.getItem('daylight-language') }));
+  const before = JSON.stringify(read());
+  language('ko');
+  assert(document.documentElement.lang==='ko' && document.querySelector('[data-page=calendar]').textContent.includes('나의 일정'), 'Korean navigation failed');
+  assert(document.querySelector('.calendar-title h2').textContent.includes('년'), 'Korean calendar date missing');
+  assert(document.querySelector('.time-axis').textContent.includes('오전'), 'Korean time missing');
+  language('en'); assert(document.querySelector('[data-page=calendar]').textContent.includes('My calendar'), 'English switch failed');
+  assert(JSON.stringify(read())===before,'Switching language changed planner records'); language('ko');
+  click('[data-action=new-task]'); fill('title','Today'); fill('subject','School'); submit();
+  const task=read().tasks.find(task=>!task.demo && task.title==='Today');
+  assert(task && task.subject==='School','Task input changed');
+  assert(document.querySelector(`[data-action=edit-task][data-id="${task.id}"]`).textContent==='Today','User title translated as interface copy');
+  click(`[data-action=edit-task][data-id="${task.id}"]`);
+  assert(document.querySelector('[name=title]').value==='Today','Editing changed user title');
+  assert(document.querySelector('#dialog-title').textContent==='할 일 수정','Dialog heading not Korean'); click('#editor [data-action=close]');
+  click('[data-action=add]'); click('[data-action=new-event]'); fill('title','QA 한국어 학원'); fill('start','22:00'); fill('end','21:00'); submit();
+  assert(document.querySelector('.form-error').textContent.includes('종료 시간'), 'Validation not Korean');
+  fill('end','23:00'); click('[name=repeat]'); submit();
+  if(document.querySelector('[data-action=save-overlap]')) click('[data-action=save-overlap]');
+  const event=read().events.find(e=>e.title==='QA 한국어 학원'); assert(event?.repeat,'Recurring class not saved');
+  click(`[data-action=event][data-key="${event.id}:${event.date}"]`);
+  assert(document.querySelector('[name=scope]').textContent.includes('이번 및 이후 일정'),'Recurrence options not Korean'); click('#editor [data-action=close]');
+  click('.layout-shortcut'); click('[data-tab=connections]');
+  assert(document.querySelector('.setup-callout a').getAttribute('href')==='/google-setup-ko.html','Korean setup link missing');
+  click('.connection-setup summary'); fill('clientId','123-fixture.apps.googleusercontent.com'); submit();
+  click('[data-action=google-connect]'); await waitFor(()=>document.querySelector('[data-source=classroom]'));
+  click('[data-action=google-sync][data-service=classroom]'); await waitFor(()=>read().classroomFeed.length===3);
+  assert(document.querySelector('.sync-success') && document.querySelector('#editor').textContent.includes('게시물 3개'), 'Korean sync feedback missing');
+  click('#editor [data-action=close]'); click('[data-page=classroom]');
+  assert(document.querySelector('[data-filter=announcements]').textContent==='공지사항','Korean feed filter missing');
+  assert(document.querySelector('.classroom-post-text').textContent.includes('Bring your lab coat'),'Teacher announcement was changed');
+  assert(document.querySelector('.classroom-attachments strong').textContent==='Study guide','Teacher attachment title changed');
+  assert(document.querySelector('#classroom-course option[value="course-one"]').textContent==='Science 101','Course name changed');
+  assert(document.querySelector('.classroom-attachments small').textContent.includes('링크'),'Attachment kind not Korean');
+  language('en'); assert(document.querySelector('[data-filter=announcements]').textContent==='Announcements','Feed English switch failed');
+  language('ko'); assert(localStorage.getItem('daylight-language')==='ko','Language preference not saved');
+  return ['Korean/English toggle preserves planner records','Korean dates, times, recurrence and validation','User-entered English titles remain unchanged','Korean Google setup and sync messages','Classroom interface translated; teacher content preserved'];
+})()

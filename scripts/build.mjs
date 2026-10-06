@@ -1,7 +1,7 @@
 import { mkdir, cp, writeFile } from 'node:fs/promises';
 import { validClientId } from '../src/google.js';
 await mkdir('dist', { recursive: true });
-for (const file of ['index.html', 'favicon.svg', 'google-setup.html', 'src']) {
+for (const file of ['index.html', 'favicon.svg', 'google-setup.html', 'google-setup-ko.html', 'src']) {
   await cp(file, `dist/${file}`, { recursive: true });
 }
 const clientId = process.env.GOOGLE_CLIENT_ID || '';

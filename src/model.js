@@ -12,8 +12,8 @@ export const timeString = n => `${String(Math.floor(n / 60)).padStart(2, '0')}:$
 export function todayInZone(zone) {
   return new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 }
-export function formatDate(date, options = { month: 'short', day: 'numeric' }) {
-  return new Intl.DateTimeFormat('en-US', { ...options, timeZone: 'UTC' }).format(new Date(`${date}T12:00:00Z`));
+export function formatDate(date, options = { month: 'short', day: 'numeric' }, locale = 'en-US') {
+  return new Intl.DateTimeFormat(locale, { ...options, timeZone: 'UTC' }).format(new Date(`${date}T12:00:00Z`));
 }
 export function occursOn(event, date) {
   return event.repeat ? date >= event.date && (!event.until || date <= event.until) && event.days.includes(weekday(date)) : event.date === date;

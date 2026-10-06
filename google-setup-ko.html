@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Google 연결 안내 — Daylight</title><link rel="icon" href="/favicon.svg"><link rel="stylesheet" href="/src/styles.css"><style>body{max-width:780px;margin:auto;padding:40px 24px 70px;line-height:1.9;font-size:14px;color:#414c62;font-family:"Noto Sans KR","Malgun Gothic",sans-serif;word-break:keep-all;overflow-wrap:anywhere}h1{font-size:30px;margin:26px 0 12px}h2{font-size:19px;margin:30px 0 12px}p,li{margin:10px 0}a{color:#6553aa;text-decoration:underline}code{font-size:12px;background:#eceaf5;padding:3px 6px;border-radius:4px;overflow-wrap:anywhere}.setup-box{background:white;border:1px solid #e1e5ee;border-radius:14px;padding:22px;margin:22px 0}.setup-nav{display:flex;justify-content:space-between;gap:15px}</style></head><body>
+<nav class="setup-nav" aria-label="안내 메뉴"><a href="/">← Daylight로 돌아가기</a><a href="/google-setup.html" lang="en">English</a></nav>
+<h1>한 번의 설정으로<br>더 편리한 플래너를 만들어요.</h1>
+<p>웹사이트 운영자가 아래 설정을 한 번 완료하면, 각 학생이 <strong>맞춤 설정 → 연결</strong>에서 자신의 Google 계정을 연결할 수 있어요.</p>
+<div class="setup-box"><strong>어떤 데이터를 가져오나요?</strong><p>캘린더는 지난 30일과 앞으로 180일의 일정을 가져와요. 클래스룸은 학생으로 참여 중인 활성 수업의 공개된 과제, 공지사항, 수업 자료를 가져와요. 공유 파일, 동영상, 설문지, 웹사이트 링크는 클래스룸 탭에 표시돼요. 동기화는 수동이며 읽기 전용이에요. Daylight에서 과제를 완료해도 클래스룸에 제출되지는 않아요.</p></div>
+<h2>1. Google Cloud 프로젝트 만들기</h2>
+<p><a href="https://console.cloud.google.com/projectcreate" target="_blank" rel="noopener">Google Cloud Console</a>에서 Daylight용 프로젝트를 만들거나 선택하세요. <strong>API 및 서비스 → 라이브러리 (APIs &amp; Services → Library)</strong>에서 <strong>Google Calendar API</strong>와 <strong>Google Classroom API</strong>를 모두 활성화하세요.</p>
+<h2>2. Google 인증 플랫폼 설정</h2>
+<p><strong>Google Auth Platform</strong> 또는 OAuth 동의 화면을 여세요. 앱 이름, 지원 이메일, 개발자 연락처를 입력하고 프로젝트에 맞는 대상을 선택하세요. 학교 내부 앱을 사용할 수 있는 경우 내부 사용자를, 그 외에는 외부 사용자를 선택할 수 있어요.</p>
+<p>외부 앱을 테스트할 때는 게시 상태를 <strong>테스트(Testing)</strong>로 유지하고, 대회 시연에 사용할 계정을 <strong>테스트 사용자(Test users)</strong>에 추가하세요. 학교에서 외부 앱 접근을 제한할 수도 있어요.</p>
+<p><strong>데이터 액세스(Data Access)</strong>에 다음 범위를 추가하세요. 아래 주소는 그대로 복사하세요.</p>
+<ul><li><code>openid</code>, <code>email</code>: 연결된 계정 확인</li><li><code>https://www.googleapis.com/auth/calendar.calendarlist.readonly</code></li><li><code>https://www.googleapis.com/auth/calendar.events.readonly</code></li><li><code>https://www.googleapis.com/auth/classroom.courses.readonly</code></li><li><code>https://www.googleapis.com/auth/classroom.coursework.me.readonly</code></li><li><code>https://www.googleapis.com/auth/classroom.announcements.readonly</code></li><li><code>https://www.googleapis.com/auth/classroom.courseworkmaterials.readonly</code></li></ul>
+<h2>3. OAuth 웹 클라이언트 만들기</h2>
+<p><strong>클라이언트(Clients)</strong>에서 <strong>웹 애플리케이션(Web application)</strong> 유형의 OAuth 클라이언트를 만드세요. <strong>승인된 JavaScript 원본(Authorized JavaScript origins)</strong>에 실제 Vercel 주소(예: <code>https://your-project.vercel.app</code>)를 추가하세요. 로컬 테스트용으로 <code>http://localhost:5173</code>과 <code>http://127.0.0.1:5173</code>도 추가하세요.</p>
+<p>원본 주소에는 프로토콜과 필요한 포트 번호를 포함하고, 경로나 마지막 슬래시는 넣지 마세요. 별도 도메인은 각각 등록해야 해요. 자주 바뀌는 미리보기 주소보다 고정 배포 주소를 사용하는 것이 편리해요. 이 앱의 팝업 로그인 방식은 별도의 리디렉션 엔드포인트를 사용하지 않아요.</p>
+<p><code>.apps.googleusercontent.com</code>으로 끝나는 <strong>클라이언트 ID(Client ID)</strong>를 복사하세요. 이 ID는 공개해도 되는 값이에요. <strong>클라이언트 보안 비밀번호(Client secret)는 웹사이트, 저장소, 설정 화면에 넣지 마세요.</strong></p>
+<h2>4. Vercel 환경 변수 설정 후 다시 배포</h2>
+<p>Vercel 프로젝트의 <strong>Settings → Environment Variables</strong>에서 <code>GOOGLE_CLIENT_ID</code>를 추가하고 복사한 클라이언트 ID를 값으로 넣으세요. 사용할 환경을 선택한 다음 다시 배포하세요. 빌드 과정에서 브라우저용 공개 설정이 자동으로 생성돼요.</p>
+<p>로컬에서 테스트하려면 Daylight의 <strong>맞춤 설정 → 연결 → 웹사이트 운영자 설정</strong>을 여세요. <strong>Google OAuth 웹 클라이언트 ID</strong>에 공개 ID를 입력하고 저장하세요. 이 테스트 설정은 현재 브라우저에만 적용돼요.</p>
+<h2>5. Google 연결 및 데이터 가져오기</h2>
+<ol><li><strong>맞춤 설정 → 연결</strong>을 여세요.</li><li><strong>Google로 로그인</strong>을 누르고 계정을 선택한 후 캘린더와 클래스룸 읽기 권한을 허용하세요.</li><li>가져올 캘린더와 수업을 선택한 다음 각 항목의 <strong>선택 항목 동기화</strong>를 누르세요.</li><li>가져온 일정은 Google 캘린더 원본으로 이동할 수 있어요. <strong>클래스룸</strong> 탭에서 공지사항을 읽고 <strong>파일 및 자료</strong>를 확인하세요. 과제에 첨부된 파일도 표시돼요. 파일은 새 탭에서 열리며, 해당 Google 계정에 파일을 볼 권한이 있어야 해요. Daylight는 파일 링크만 저장하고 파일 내용을 다운로드하거나 백업하지 않아요.</li></ol>
+<p>접근 토큰은 메모리에만 보관되며 만료돼요. 페이지를 새로고침하거나 연결이 만료되면 다시 로그인하세요. 가져온 항목과 화면 설정은 이 브라우저에 저장돼요. Google 로그인은 Daylight 계획의 클라우드 백업 기능이 아니에요.</p>
+<p><strong>기존 연결에 새 기능 추가:</strong> 공지사항과 수업 자료용 읽기 권한을 위 목록대로 Google 인증 플랫폼에 추가하세요. 다시 로그인해 추가 권한을 허용한 후 동기화하세요.</p>
+<h2>문제 해결</h2>
+<ul><li><strong>원본 주소 불일치:</strong> 현재 웹사이트의 정확한 원본 주소를 승인된 JavaScript 원본에 추가하세요.</li><li><strong>접근 차단:</strong> 계정을 테스트 사용자에 추가하고 학교의 외부 앱 정책을 확인하세요.</li><li><strong>권한 거부:</strong> 두 API를 모두 활성화하고 요청한 읽기 권한을 허용하세요.</li><li><strong>수업이 보이지 않음:</strong> 활성 수업에 학생으로 참여 중인 계정인지 확인하세요. 선생님으로만 참여 중인 수업은 가져오지 않아요.</li><li><strong>팝업 차단:</strong> 이 웹사이트의 팝업을 허용하고 다시 연결하세요.</li><li><strong>연결 만료:</strong> 다시 로그인한 후 동기화하세요. 동기화가 실패해도 기존에 가져온 데이터는 유지돼요.</li></ul>
+<h2>전체 공개 전에 확인하세요</h2>
+<p>초대한 사용자만 참여하는 대회 시연에는 테스트 모드를 사용할 수 있어요. 불특정 다수에게 공개할 때는 Google에서 OAuth 앱 검증, 도메인 확인, 정확한 개인정보처리방침 등을 요구할 수 있어요. 프로젝트의 Google 인증 플랫폼에 표시된 요건을 확인하세요.</p>
+<p><a href="https://developers.google.com/identity/oauth2/web/guides/get-google-api-clientid">Google 공식 OAuth 설정 안내</a> · <a href="https://developers.google.com/identity/oauth2/web/guides/use-token-model">브라우저 토큰 방식</a> · <a href="https://developers.google.com/workspace/classroom/reference/rest/v1/courses.courseWork/list">클래스룸 권한 안내</a></p>
+</body></html>

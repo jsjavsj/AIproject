@@ -57,6 +57,12 @@ Recurring exceptions are indexed by their original date, so moving a single clas
 
 The sample plan is generated relative to the first visit. Remove it in Settings when ready. Google Fonts is used for typography, with system fallbacks when unavailable. The app has no analytics. When a user connects Google, the browser calls Google APIs directly; this app has no server storing Google data.
 
+## 한국어 / English
+
+The interface opens in Korean by default. Use the language selector at the top of the page, or **Customize → Layout → Language**, to switch between 한국어 and English. The choice persists in this browser under `daylight-language`. Dates, times, dialogs, validation, Google connection messages, and Classroom controls follow the selected language. Personal entries and teachers’ content retain their original text; built-in sample entries have Korean display labels. Language changes do not rewrite planner records.
+
+Google setup instructions are available in [한국어](google-setup-ko.html) and [English](google-setup.html). OAuth identifiers, scope URLs, and environment variable names stay unchanged in both guides.
+
 ## Source layout
 
 - `src/model.js`: pure recurrence, date, conflict, layout, and sample-data logic.
@@ -66,8 +72,10 @@ The sample plan is generated relative to the first visit. Remove it in Settings 
 - `src/google.js`: Google Identity Services authorization and paginated API requests.
 - `src/google-data.js`: time-zone conversion, source metadata, and stable import merging.
 - `src/classroom.js`, `src/classroom.css`: Classroom posts, safe attachment links, feed validation, and responsive styling.
+- `src/i18n.js`, `src/ko.js`, `src/language.css`: saved language choice, Korean interface translations, original-content exclusions, and Korean typography.
 - `tests/model.test.mjs`: scheduling regression tests.
 - `tests/google.test.mjs`: import, error-handling, identity, and layout tests.
 - `tests/classroom.test.mjs`: attachment types, safe URLs, post refresh, backup validation, and Classroom API pagination.
+- `tests/i18n.test.mjs`, `tests/browser-korean-flow.js`: language persistence, localized scheduling/Google flows, and preservation of user and teacher content.
 - `tests/google-browser-mock.js`, `tests/browser-google-flow.js`: isolated simulated browser integration test (never included in the production build).
 - `scripts/`: dependency-free local server and production build.

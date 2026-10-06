@@ -7,6 +7,8 @@
   const read = () => JSON.parse(localStorage.getItem('daylight-planner-v1'));
   const waitFor = async check => { for (let i = 0; i < 100; i++) { if (check()) return; await new Promise(resolve => setTimeout(resolve, 30)); } throw Error('Timed out waiting for UI'); };
   window.__plannerBeforeGoogleTest = localStorage.getItem('daylight-planner-v1');
+  window.__languageBeforeGoogleTest = localStorage.getItem('daylight-language');
+  const language = document.querySelector('[data-language]'); language.value = 'en'; language.dispatchEvent(new Event('change', { bubbles: true }));
   const results = [];
   click('.layout-shortcut'); fill('defaultView', 'week'); fill('weekStartsOn', '0'); fill('density', 'compact');
   click('[name="accent"][value="forest"]'); click('[name="showStats"]'); click('[name="showTasks"]'); submit();
