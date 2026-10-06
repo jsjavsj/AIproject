@@ -88,4 +88,6 @@ export class GoogleConnection {
     return this.pages('calendar', url.href, 'items');
   }
   courseWork(id) { return this.pages('classroom', `https://classroom.googleapis.com/v1/courses/${encodeURIComponent(id)}/courseWork?pageSize=100&courseWorkStates=PUBLISHED`, 'courseWork'); }
+  announcements(id) { return this.pages('classroom', `https://classroom.googleapis.com/v1/courses/${encodeURIComponent(id)}/announcements?pageSize=100&announcementStates=PUBLISHED`, 'announcements'); }
+  courseMaterials(id) { return this.pages('classroom', `https://classroom.googleapis.com/v1/courses/${encodeURIComponent(id)}/courseWorkMaterials?pageSize=100&courseWorkMaterialStates=PUBLISHED`, 'courseWorkMaterial'); }
 }

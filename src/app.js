@@ -2,6 +2,7 @@ import { CATEGORIES, uid, addDays, weekday, weekStart as modelWeekStart, minutes
 import { DEFAULT_LAYOUT, normalizeLayout } from './preferences.js';
 import { GoogleConnection, loadGoogleIdentity, validClientId } from './google.js';
 import { calendarToEvents, courseworkToTasks, mergeImported, safeGoogleLink } from './google-data.js';
+import { classroomPosts, mergeClassroomFeed, safeAttachmentLink, validClassroomFeed } from './classroom.js';
 
 const paths = {
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/>',
@@ -35,6 +36,8 @@ try {
 }
 state.layout = normalizeLayout(state.layout);
 state.connections ||= {};
+state.classroomFeed ||= [];
+let classroomFilter = 'all', classroomCourse = '';
 const weekStart = date => modelWeekStart(date, state.layout.weekStartsOn);
 const hourHeight = () => state.layout.density === 'compact' ? 52 : 68;
 const googleConnection = new GoogleConnection();
@@ -72,7 +75,7 @@ function miniCalendar() {
 }
 function sidebar() {
   return `<aside class="sidebar" aria-label="Workspace navigation"><a class="brand" href="#" aria-label="Daylight home"><span class="brand-mark">${icon('sun')}</span>daylight<span class="brand-period">.</span></a><div class="workspace"><span class="workspace-icon">${icon('book')}</span><div><strong>My workspace</strong><small>A little more organized</small></div></div>
-  <p class="nav-label">YOUR SPACE</p><nav>${[['grid', 'overview', 'Overview'], ['calendar', 'calendar', 'My calendar'], ['tasks', 'tasks', 'My tasks']].map(([i, p, label]) => `<button class="nav-item ${page === p ? 'active' : ''}" data-action="page" data-page="${p}">${icon(i)}<span>${label}</span>${p === 'tasks' ? `<span class="nav-count">${state.tasks.filter(t => !t.done).length}</span>` : ''}</button>`).join('')}</nav>
+  <p class="nav-label">YOUR SPACE</p><nav>${[['grid', 'overview', 'Overview'], ['calendar', 'calendar', 'My calendar'], ['tasks', 'tasks', 'My tasks'], ['book', 'classroom', 'Classroom']].map(([i, p, label]) => `<button class="nav-item ${page === p ? 'active' : ''}" data-action="page" data-page="${p}">${icon(i)}<span>${label}</span>${p === 'tasks' ? `<span class="nav-count">${state.tasks.filter(t => !t.done).length}</span>` : ''}</button>`).join('')}</nav>
   <section class="mini-section">${miniCalendar()}</section><section class="categories"><p class="nav-label">MY CALENDARS</p>${Object.entries(CATEGORIES).map(([key, label]) => `<label class="category-filter"><input type="checkbox" data-category="${key}" ${enabled.has(key) ? 'checked' : ''} /><span class="category-check ${key}">${icon('check')}</span>${label}<span class="category-dot ${key}"></span></label>`).join('')}</section>
   <div class="sidebar-bottom"><div class="gentle-note">${icon('leaf')}<strong>Progress, at your pace.</strong><p>Make a little room for yourself, too.</p></div><button class="nav-item" data-action="settings">${icon('settings')}<span>Settings & data</span></button><div class="profile"><span class="avatar">S</span><div><strong>Student workspace</strong><small>Personal planner</small></div><span class="online-dot"></span></div></div></aside>`;
 }
@@ -88,11 +91,11 @@ function render() {
   const done = state.tasks.filter(t => t.done).length, active = state.tasks.filter(t => !t.done);
   const week = occurrences(state.events, weekStart(selected), addDays(weekStart(selected), 6));
   const hours = week.reduce((n, e) => n + (e.allDay ? 0 : minutes(e.end) - minutes(e.start)), 0) / 60;
-  app.innerHTML = `${sidebar()}<main class="main"><header class="topbar"><div class="breadcrumb">My workspace <span>/</span> <strong>${page === 'calendar' ? 'My calendar' : page === 'tasks' ? 'My tasks' : 'Overview'}</strong></div><div class="topbar-right"><button class="button quiet layout-shortcut" data-action="settings">${icon('settings')}<span>Customize</span></button><button class="button quiet google-account-shortcut" data-action="settings-tab" data-tab="connections">${googleConnection.account('calendar') || googleConnection.account('classroom') ? 'Google account' : 'Google sign-in'}</button><span class="local-badge"><span></span>${storageIssue ? 'Changes need a backup' : 'Saved on this device'}</span><button class="avatar small" data-action="settings" aria-label="Open settings and backups">S</button></div></header>
-  <div class="main-content"><section class="page-heading"><div><div class="eyebrow">A LITTLE STRUCTURE. A LOT OF POSSIBILITY.</div><h1>${page === 'calendar' ? 'Make space for your day' : page === 'tasks' ? 'Small steps. Real progress.' : 'Your day, a little clearer.'}<span class="heading-sun">${icon('sun')}</span></h1><p>Classes, goals, and everything in between. You’ve got this.</p></div><button class="button primary" data-action="add">${icon('plus')}<span>Add new</span></button></section>
+  app.innerHTML = `${sidebar()}<main class="main"><header class="topbar"><div class="breadcrumb">My workspace <span>/</span> <strong>${page === 'calendar' ? 'My calendar' : page === 'tasks' ? 'My tasks' : page === 'classroom' ? 'Classroom' : 'Overview'}</strong></div><div class="topbar-right"><button class="button quiet layout-shortcut" data-action="settings">${icon('settings')}<span>Customize</span></button><button class="button quiet google-account-shortcut" data-action="settings-tab" data-tab="connections">${googleConnection.account('calendar') || googleConnection.account('classroom') ? 'Google account' : 'Google sign-in'}</button><span class="local-badge"><span></span>${storageIssue ? 'Changes need a backup' : 'Saved on this device'}</span><button class="avatar small" data-action="settings" aria-label="Open settings and backups">S</button></div></header>
+  <div class="main-content"><section class="page-heading"><div><div class="eyebrow">A LITTLE STRUCTURE. A LOT OF POSSIBILITY.</div><h1>${page === 'calendar' ? 'Make space for your day' : page === 'tasks' ? 'Small steps. Real progress.' : page === 'classroom' ? 'A little closer to your class.' : 'Your day, a little clearer.'}<span class="heading-sun">${icon('sun')}</span></h1><p>Classes, goals, and everything in between. You’ve got this.</p></div><button class="button primary" data-action="add">${icon('plus')}<span>Add new</span></button></section>
   ${storageIssue ? `<div class="warning">${esc(storageIssue)}</div>` : ''}
   <section class="stats"><div class="stat"><span class="stat-icon lavender">${icon('calendar')}</span><div><small>This week</small><strong>${week.length} <span>planned sessions</span></strong></div><span class="stat-note">Let’s make it a good one</span></div><div class="stat"><span class="stat-icon mint">${icon('check')}</span><div><small>Making progress</small><strong>${done}<span> / ${state.tasks.length} tasks complete</span></strong></div><div class="mini-progress" style="--progress:${state.tasks.length ? done / state.tasks.length * 100 : 0}%"></div></div><div class="stat"><span class="stat-icon peach">${icon('clock')}</span><div><small>Time planned</small><strong>${Number(hours.toFixed(1))}<span> hours this week</span></strong></div></div></section>
-  <div class="planner-layout ${page !== 'calendar' ? 'alternate-page' : ''}"><section class="calendar-card">${page === 'calendar' ? calendar() : page === 'tasks' ? taskPage() : overview()}</section><aside class="right-panel" aria-label="Tasks and upcoming class">${rightPanel(active, done)}</aside></div>
+  <div class="planner-layout ${page !== 'calendar' ? 'alternate-page' : ''}"><section class="calendar-card">${page === 'calendar' ? calendar() : page === 'tasks' ? taskPage() : page === 'classroom' ? classroomPage() : overview()}</section><aside class="right-panel" aria-label="Tasks and upcoming class">${rightPanel(active, done)}</aside></div>
   <footer class="page-footer"><span>${icon('sun')} A plan for your day. Space for your life.</span><span>${esc(state.timezone)} · Browser-local storage</span></footer></div></main>`;
   bindDrag();
   const calendarScroll = app.querySelector('.calendar-scroll');
@@ -222,7 +225,7 @@ function showConnections() {
   openDialog(`${dialogHeader('Bring your plans together', 'Your classes and commitments, in one calm place.')}${settingsTabs('connections')}
     <div class="connection-intro">Read-only imports. Your Google events and assignments are never changed by Daylight.</div>
     ${!configured ? `<div class="setup-callout"><strong>One-time Google setup needed</strong><p>The website owner needs to create a Google OAuth client ID. After setup, each student connects their own Google account.</p><a href="/google-setup.html" target="_blank" rel="noopener" class="button quiet">Open setup guide ${icon('arrow')}</a></div>` : ''}
-    <section class="google-account-card"><h3>${account ? 'Your Google account' : 'One account. Both connections.'}</h3><p>${account ? esc(account.email) : 'Sign in once and allow Daylight to read this account’s Calendar events and Classroom assignments.'}</p><div class="connection-actions"><button class="button quiet google-signin" data-action="google-connect" ${!configured || busy ? 'disabled' : ''}><span aria-hidden="true" class="google-letter">G</span>${busy ? 'Please wait…' : account ? 'Switch Google account' : 'Sign in with Google'}</button>${account ? `<button class="text-button" data-action="google-signout" ${busy ? 'disabled' : ''}>Sign out</button>` : ''}</div><small>Google asks for your permission. Sign-in does not provide cloud backup of your Daylight plans.</small></section>
+    <section class="google-account-card"><h3>${account ? 'Your Google account' : 'One account. Both connections.'}</h3><p>${account ? esc(account.email) : 'Sign in once and allow Daylight to read this account’s Calendar events and Classroom assignments, announcements, and materials.'}</p><div class="connection-actions"><button class="button quiet google-signin" data-action="google-connect" ${!configured || busy ? 'disabled' : ''}><span aria-hidden="true" class="google-letter">G</span>${busy ? 'Please wait…' : account ? 'Switch Google account' : 'Sign in with Google'}</button>${account ? `<button class="text-button" data-action="google-signout" ${busy ? 'disabled' : ''}>Sign out</button>` : ''}</div><small>Google asks for your permission. Sign-in does not provide cloud backup of your Daylight plans.</small></section>
     ${['calendar', 'classroom'].map(service => connectionCard(service, configured)).join('')}
     <details class="connection-setup"><summary>Website owner setup</summary><p>For production, set GOOGLE_CLIENT_ID in Vercel and redeploy. For local testing, you can save a public client ID below. Never enter a client secret.</p><form id="google-config-form"><label>Google OAuth web client ID<input name="clientId" value="${esc(clientId())}" placeholder="123456-example.apps.googleusercontent.com" ${globalThis.DAYLIGHT_CONFIG?.googleClientId ? 'readonly' : ''} required /></label><button class="button quiet" ${globalThis.DAYLIGHT_CONFIG?.googleClientId ? 'disabled' : ''}>Save test client ID</button><div class="form-error" role="alert"></div></form><a href="/google-setup.html" target="_blank" rel="noopener">Read the complete setup guide ↗</a></details>
     <p class="field-note connection-privacy">Access tokens stay in memory and expire. Reconnect after refreshing this page. Imported items stay in this browser until refreshed or removed. <a href="https://myaccount.google.com/connections" target="_blank" rel="noopener">Manage Google permissions ↗</a></p>`);
@@ -235,13 +238,30 @@ function connectionCard(service, configured) {
   const list = ui.items || [], count = (isCalendar ? state.events : state.tasks).filter(e => e.remote?.service === service).length;
   const busy = !!ui.busy;
   return `<section class="connection-card"><div class="connection-heading"><span class="service-icon ${service}">${icon(isCalendar ? 'calendar' : 'book')}</span><div><h3>Google ${isCalendar ? 'Calendar' : 'Classroom'}</h3><span class="connection-status ${connected ? 'connected' : ''}">${connected ? 'Connected for this session' : meta.syncedAt ? 'Reconnect to refresh' : configured ? 'Not connected' : 'Setup required'}</span></div></div>
-    <p>${isCalendar ? 'Import events from your calendars, including recurring classes and all-day events.' : 'Turn assignments from your enrolled courses into tasks with due dates.'}</p>
+    <p>${isCalendar ? 'Import events from your calendars, including recurring classes and all-day events.' : 'Import assignments as tasks, plus teacher announcements and shared files in your Classroom feed.'}</p>
     ${account || meta.email ? `<div class="connection-account">${esc(account?.email || meta.email)}</div>` : ''}
     ${meta.syncedAt ? `<p class="sync-meta">Last import: ${esc(new Date(meta.syncedAt).toLocaleString())} · ${count} ${isCalendar ? 'event segments' : 'tasks'}</p>` : ''}
     ${connected && ui.items ? `<fieldset class="source-picker"><legend>${isCalendar ? 'Choose calendars' : 'Choose courses'}</legend>${list.length ? list.map(item => `<label><input type="checkbox" data-source="${service}" value="${esc(item.id)}" ${(meta.selectedIds || []).includes(item.id) ? 'checked' : ''} ${busy ? 'disabled' : ''}/><span>${esc(item.summary || item.name)}${item.primary ? ' <small>Primary</small>' : ''}</span></label>`).join('') : `<p>No ${isCalendar ? 'calendars' : 'active enrolled courses'} were found for this account.</p>`}</fieldset>` : ''}
     ${isCalendar ? `<p class="field-note">Imports the previous 30 days and next 180 days. Sync replaces this Google snapshot; your own plans stay.</p>` : `<p class="field-note">Completion is your personal checklist, not submission status. Turn in work in Classroom.</p>`}
     ${ui.error ? `<p class="form-error" role="alert">${esc(ui.error)}</p>` : ''}${ui.notice ? `<p class="sync-success" role="status">${esc(ui.notice)}</p>` : ''}
-    <div class="connection-actions">${connected ? `<button class="button primary" data-action="google-sync" data-service="${service}" ${busy || !list.length ? 'disabled' : ''}>${busy ? esc(ui.busy) : 'Sync selected'}</button><button class="button quiet" data-action="google-sources" data-service="${service}" ${busy ? 'disabled' : ''}>Refresh list</button>` : `<span class="field-note">${busy ? esc(ui.busy) : 'Use Google sign-in above to connect both services.'}</span>`}${count ? `<button class="text-button danger-text" data-action="google-remove" data-service="${service}" ${busy ? 'disabled' : ''}>Remove imports</button>` : ''}</div></section>`;
+    <div class="connection-actions">${connected ? `<button class="button primary" data-action="google-sync" data-service="${service}" ${busy || !list.length ? 'disabled' : ''}>${busy ? esc(ui.busy) : 'Sync selected'}</button><button class="button quiet" data-action="google-sources" data-service="${service}" ${busy ? 'disabled' : ''}>Refresh list</button>` : `<span class="field-note">${busy ? esc(ui.busy) : 'Use Google sign-in above to connect both services.'}</span>`}${(count || (!isCalendar && state.classroomFeed.length)) ? `<button class="text-button danger-text" data-action="google-remove" data-service="${service}" ${busy ? 'disabled' : ''}>Remove imports</button>` : ''}</div></section>`;
+}
+function classroomPage() {
+  const feed = state.classroomFeed, meta = state.connections.classroom || {};
+  const courses = [...new Map(feed.map(post => [post.remote.container, post.remote.label])).entries()];
+  if (classroomCourse && !courses.some(([id]) => id === classroomCourse)) classroomCourse = '';
+  const posts = feed.filter(post => (!classroomCourse || post.remote.container === classroomCourse) && (classroomFilter === 'all' || (classroomFilter === 'announcements' ? post.kind === 'announcement' : post.attachments.length > 0 || post.kind === 'material')));
+  return `<div class="classroom-page"><div class="classroom-intro"><span class="classroom-symbol">${icon('book')}</span><div><div class="eyebrow">FROM YOUR CLASSROOM</div><h2>Stay in the loop</h2><p>Teacher updates, study materials, and the files you need.</p></div><button class="button quiet" data-action="settings-tab" data-tab="connections">${icon('repeat')} Sync & courses</button></div>
+    <div class="classroom-toolbar"><div class="segmented" aria-label="Classroom content">${[['all', 'All posts'], ['announcements', 'Announcements'], ['files', 'Files & materials']].map(([value, label]) => `<button data-action="classroom-filter" data-filter="${value}" class="${classroomFilter === value ? 'active' : ''}" aria-pressed="${classroomFilter === value}">${label}</button>`).join('')}</div><label>Course<select id="classroom-course"><option value="">All courses</option>${courses.map(([id, name]) => `<option value="${esc(id)}" ${classroomCourse === id ? 'selected' : ''}>${esc(name)}</option>`).join('')}</select></label></div>
+    <p class="classroom-sync">${meta.syncedAt ? `Last synced ${esc(new Date(meta.syncedAt).toLocaleString())} · ${esc(meta.email || '')}. Sync to get new posts.` : 'Connect your Google account and sync your courses to get started.'}</p>
+    <div class="classroom-posts">${posts.length ? posts.map(post => {
+      const url = safeGoogleLink(post.remote.url, 'classroom');
+      return `<article class="classroom-post"><div class="classroom-post-meta"><span class="source-chip classroom-chip">${esc(post.remote.label)}</span><span>${post.kind === 'announcement' ? 'Announcement' : post.kind === 'assignment' ? 'Assignment' : 'Material'}</span>${post.updatedAt ? `<time datetime="${esc(post.updatedAt)}">${esc(new Date(post.updatedAt).toLocaleDateString(undefined, { timeZone: state.timezone, month: 'short', day: 'numeric', year: 'numeric' }))}</time>` : ''}</div><h3>${esc(post.title)}</h3>${post.text ? `<p class="classroom-post-text">${esc(post.text)}</p>` : ''}${post.attachments.length ? `<ul class="classroom-attachments">${post.attachments.map(file => {
+        const link = safeAttachmentLink(file.url);
+        const content = `${icon(file.kind === 'File' ? 'book' : 'arrow')}<span><strong>${esc(file.title)}</strong><small>${esc(file.kind)} · ${link ? esc(new URL(link).hostname) : 'Open the post in Classroom to view'}</small></span>${link ? '<span aria-hidden="true">↗</span>' : ''}`;
+        return `<li>${link ? `<a href="${esc(link)}" target="_blank" rel="noopener noreferrer">${content}</a>` : `<div class="unavailable-attachment">${content}</div>`}</li>`;
+      }).join('')}</ul>` : ''}${url ? `<a class="classroom-original" href="${esc(url)}" target="_blank" rel="noopener noreferrer">Open in Classroom ↗</a>` : ''}</article>`;
+    }).join('') : `<div class="empty-state">${icon('book')}<h3>${feed.length ? 'Nothing in this view yet' : meta.syncedAt ? 'No published posts yet' : 'Your classroom, all together'}</h3><p>${feed.length ? 'Try another course or content filter.' : meta.syncedAt ? 'Your selected courses have no published posts. Check again after your teacher shares an update.' : 'Sign in with Google, choose your courses, and sync to see announcements and shared files here.'}</p><button class="button primary" data-action="settings-tab" data-tab="connections">${meta.syncedAt ? 'Manage courses' : 'Connect Google Classroom'}</button></div>`}</div><p class="classroom-footnote">Files open in a new tab with your existing Google access. This page saves post details and links, not file contents.</p></div>`;
 }
 function refreshConnections() { if (dialog.open && dialog.dataset.settingsTab === 'connections') showConnections(); }
 async function loadSources(service) {
@@ -264,6 +284,7 @@ async function connectGoogle() {
     // Switching accounts removes only previous accounts' imported copies; personal plans remain.
     state.events = state.events.filter(item => !item.remote || item.remote.account === account.id);
     state.tasks = state.tasks.filter(item => !item.remote || item.remote.account === account.id);
+    state.classroomFeed = state.classroomFeed.filter(item => item.remote.account === account.id);
     for (const service of services) delete connectionUI[service].items;
     await Promise.all(services.map(async service => {
       try { await loadSources(service); connectionUI[service].notice = 'Choose what to import, then select Sync selected.'; }
@@ -286,20 +307,25 @@ async function syncGoogle(service, sourcesOnly = false) {
     const ids = state.connections[service]?.selectedIds || [];
     if (!ids.length) throw Error('Choose at least one calendar or course to import.');
     const from = addDays(todayInZone(state.timezone), -30), to = addDays(todayInZone(state.timezone), 180);
-    const timezone = state.timezone, incoming = [];
+    const timezone = state.timezone, incoming = [], incomingFeed = [];
     for (const id of ids) {
       const container = ui.items.find(item => item.id === id); if (!container) continue;
       if (service === 'calendar') incoming.push(...calendarToEvents(await googleConnection.calendarEvents(id, from, to), container, account.id, timezone, from, to));
-      else incoming.push(...courseworkToTasks(await googleConnection.courseWork(id), container, account.id, timezone));
+      else {
+        const [work, announcements, materials] = await Promise.all([googleConnection.courseWork(id), googleConnection.announcements(id), googleConnection.courseMaterials(id)]);
+        incoming.push(...courseworkToTasks(work, container, account.id, timezone));
+        incomingFeed.push(...classroomPosts(announcements, 'announcement', container, account.id), ...classroomPosts(materials, 'material', container, account.id), ...classroomPosts(work, 'assignment', container, account.id));
+      }
     }
     if (state.timezone !== timezone) throw Error('Your planner time zone changed during import. Sync again to use the new time zone.');
-    if (incoming.length > 4500) throw Error('Too many items to import at once. Select fewer calendars or courses.');
+    if (incoming.length > 4500 || incomingFeed.length > 4500) throw Error('Too many items to import at once. Select fewer calendars or courses.');
     const field = service === 'calendar' ? 'events' : 'tasks';
     const merged = mergeImported(state[field], incoming, service);
     if (merged.length > 5000) throw Error('The planner is full. Remove some items before syncing.');
     state[field] = merged;
+    if (service === 'classroom') state.classroomFeed = mergeClassroomFeed(state.classroomFeed, incomingFeed);
     state.connections[service].syncedAt = new Date().toISOString();
-    const saved = save(); render(); ui.notice = saved ? `Imported ${incoming.length} ${service === 'calendar' ? 'event segments' : 'assignments'}. You’re up to date.` : storageIssue;
+    const saved = save(); render(); ui.notice = saved ? `Imported ${incoming.length} ${service === 'calendar' ? 'event segments' : `assignments and ${incomingFeed.length} Classroom posts`}. You’re up to date.` : storageIssue;
   } catch (error) { ui.error = error.message; }
   finally { ui.busy = ''; refreshConnections(); }
 }
@@ -378,6 +404,7 @@ document.addEventListener('click', e => {
   } else if (action === 'settings') showSettings();
   else if (action === 'settings-tab') showSettings(button.dataset.tab);
   else if (action === 'layout-reset') { state.layout = { ...DEFAULT_LAYOUT }; view = state.layout.defaultView; commit('Layout reset. Your plans are unchanged.'); showSettings('layout'); }
+  else if (action === 'classroom-filter') { classroomFilter = button.dataset.filter; render(); document.querySelector(`[data-action="classroom-filter"][data-filter="${classroomFilter}"]`)?.focus(); }
   else if (action === 'google-connect') connectGoogle();
   else if (action === 'google-signout') { if (Object.values(connectionUI).some(ui => ui.busy)) return; for (const service of ['calendar', 'classroom']) { googleConnection.disconnect(service); connectionUI[service] = {}; } render(); refreshConnections(); toast('Signed out of Daylight’s Google connections. Imported copies remain in this browser.'); }
   else if (action === 'google-sync') syncGoogle(button.dataset.service);
@@ -387,6 +414,7 @@ document.addEventListener('click', e => {
     if (confirm('Remove these Google imports from Daylight? Your Google data and your own plans will stay.')) {
       const field = service === 'calendar' ? 'events' : 'tasks';
       state[field] = state[field].filter(item => item.remote?.service !== service);
+      if (service === 'classroom') state.classroomFeed = [];
       if (state.connections[service]) delete state.connections[service].syncedAt;
       commit('Imported items removed.'); refreshConnections();
     }
@@ -419,6 +447,7 @@ document.addEventListener('submit', e => {
   }
 });
 document.addEventListener('change', async e => {
+  if (e.target.id === 'classroom-course') { classroomCourse = e.target.value; render(); document.querySelector('#classroom-course')?.focus(); return; }
   if (e.target.name === 'accent') dialog.querySelector('.layout-preview').dataset.previewAccent = e.target.value;
   if (e.target.dataset.source) {
     const service = e.target.dataset.source;
@@ -438,7 +467,7 @@ document.addEventListener('change', async e => {
     try {
       const data = JSON.parse(await e.target.files[0].text());
       validateBackup(data);
-      if (confirm('Replace your current planner with this backup? Export your current plan first if you want to keep it.')) { state = data; state.layout = normalizeLayout(state.layout); state.connections ||= {}; for (const service of ['calendar', 'classroom']) { googleConnection.disconnect(service); connectionUI[service] = {}; } view = state.layout.defaultView; selected = todayInZone(state.timezone); miniMonth = selected.slice(0, 7); storageIssue = ''; dialog.close(); commit('Your planner has been restored.'); }
+      if (confirm('Replace your current planner with this backup? Export your current plan first if you want to keep it.')) { state = data; state.layout = normalizeLayout(state.layout); state.connections ||= {}; state.classroomFeed ||= []; for (const service of ['calendar', 'classroom']) { googleConnection.disconnect(service); connectionUI[service] = {}; } view = state.layout.defaultView; selected = todayInZone(state.timezone); miniMonth = selected.slice(0, 7); storageIssue = ''; dialog.close(); commit('Your planner has been restored.'); }
     } catch { toast('That file is not a valid Daylight backup. Your plan has not changed.'); }
   }
 });
@@ -449,6 +478,7 @@ function validateBackup(data) {
   const idOK = id => typeof id === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(id);
   const eventOK = e => textOK(e.title) && Object.hasOwn(CATEGORIES, e.category) && dateOK(e.date) && timeOK(e.start) && timeOK(e.end) && minutes(e.end) > minutes(e.start);
   if (data?.version !== 1 || !Array.isArray(data.events) || !Array.isArray(data.tasks) || data.events.length > 5000 || data.tasks.length > 5000) throw Error();
+  if (data.classroomFeed !== undefined && !validClassroomFeed(data.classroomFeed)) throw Error();
   if (data.connections !== undefined && (!data.connections || typeof data.connections !== 'object' || Array.isArray(data.connections))) throw Error();
   for (const service of ['calendar', 'classroom']) {
     const meta = data.connections?.[service];

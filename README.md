@@ -29,7 +29,7 @@ Push the source files to the GitHub repository and import it into Vercel. Use th
 - Browser-local persistence, sample-data removal, JSON backup export, and validated restore in Settings.
 - Layout preferences: default calendar view, Sunday/Monday week start, comfortable/compact spacing, three accent colors, and optional task panel and summary cards.
 - Google Calendar: select calendars and manually import the previous 30 days and next 180 days, including expanded recurring occurrences, all-day events, and split overnight events. Imports are read-only and link to the original event.
-- Google Classroom: select active enrolled courses and import published assignments with deadlines converted from UTC to the planner time zone. Keep personal priorities, estimates, study-session links, and completion across refreshes. Checking off a task does not submit an assignment.
+- Google Classroom: select active enrolled courses and import published assignments with deadlines converted from UTC to the planner time zone. Keep personal priorities, estimates, study-session links, and completion across refreshes. Checking off a task does not submit an assignment. A Classroom feed shows published announcements, class materials, and assignment attachments, with content and course filters. File, video, form, and website links open in a new tab using existing access; file contents are not stored.
 
 ## Connect Google
 
@@ -41,11 +41,11 @@ Push the source files to the GitHub repository and import it into Vercel. Use th
 
 A single permission flow connects both services to the same verified Google account. Switching accounts replaces both connections and clears the previous account's imported copies, while retaining personal plans. One **Sign out** button clears both in-memory connections; imported copies remain available in the browser until removed or replaced on an account switch. Denied permissions do not establish a partially connected new account.
 
-The website includes [detailed instructions and troubleshooting](google-setup.html). Google may require app verification before public use; school administrators may restrict third-party app access. This integration uses the official [Google Identity Services browser token model](https://developers.google.com/identity/oauth2/web/guides/use-token-model). It requires read-only Calendar and Classroom scopes plus `openid` and `email` for account identity. It does not need an API key or client secret.
+The website includes [detailed instructions and troubleshooting](google-setup.html). Google may require app verification before public use; school administrators may restrict third-party app access. This integration uses the official [Google Identity Services browser token model](https://developers.google.com/identity/oauth2/web/guides/use-token-model). For the Classroom feed, configure `classroom.announcements.readonly` and `classroom.courseworkmaterials.readonly` in addition to the existing scopes, then reconnect to approve them. The full scope URLs are listed in the setup guide. It requires read-only Calendar and Classroom scopes plus `openid` and `email` for account identity. It does not need an API key or client secret.
 
 Access tokens live only in memory. Reconnect after a refresh or expiry; no background sync or refresh tokens are stored. Import selections, account labels, last-sync timestamps, and imported records are stored locally and included in backups. Disconnect clears this browser session; removing imports deletes local copies only. Google permission revocation is available through the link in Connections.
 
-A successful sync replaces all previously imported records for that service with the selected sources. It removes deleted/deselected records and preserves local plans. Failed requests (including a failed later page or course) leave the previous import intact. Calendar changes are made in Google; Classroom submission happens in Classroom. Imported assignment title/subject/deadline are read-only, while personal priority and estimate are editable. Changing the planner time zone requires syncing again to update imported times.
+A successful sync replaces all previously imported records for that service with the selected sources. It removes deleted/deselected records and preserves local plans. Failed requests (including a failed later page, announcements/materials request, or course) leave the previous import intact. Classroom tasks and feed posts refresh together only after every selected course succeeds. Switching accounts clears the previous account’s imported posts; removing Classroom imports removes both tasks and posts. Calendar changes are made in Google; Classroom submission happens in Classroom. Imported assignment title/subject/deadline are read-only, while personal priority and estimate are editable. Changing the planner time zone requires syncing again to update imported times.
 
 ## Data and time behavior
 
@@ -65,7 +65,9 @@ The sample plan is generated relative to the first visit. Remove it in Settings 
 - `src/settings.css`, `src/preferences.js`: connection/layout UI styling and validated layout preferences.
 - `src/google.js`: Google Identity Services authorization and paginated API requests.
 - `src/google-data.js`: time-zone conversion, source metadata, and stable import merging.
+- `src/classroom.js`, `src/classroom.css`: Classroom posts, safe attachment links, feed validation, and responsive styling.
 - `tests/model.test.mjs`: scheduling regression tests.
 - `tests/google.test.mjs`: import, error-handling, identity, and layout tests.
+- `tests/classroom.test.mjs`: attachment types, safe URLs, post refresh, backup validation, and Classroom API pagination.
 - `tests/google-browser-mock.js`, `tests/browser-google-flow.js`: isolated simulated browser integration test (never included in the production build).
 - `scripts/`: dependency-free local server and production build.
