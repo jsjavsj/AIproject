@@ -10,6 +10,8 @@ test('Korean messages preserve dynamic counts and switch back to original Englis
     setLanguage('ko');
     assert.equal(t('Imported 2 assignments and 3 Classroom posts. You’re up to date.'), '과제 2개와 클래스룸 게시물 3개를 가져왔어요. 최신 상태예요.');
     assert.equal(t('  Today '), '  오늘 ');
+    assert.equal(t('Google returned an incomplete sign-in response. Please reconnect.'), 'Google 로그인 응답이 완전하지 않아요. 다시 연결하세요.');
+    assert.equal(t('Missing Google permissions: classroom.announcements.readonly. Reconnect and approve these permissions. If already approved, check your school’s app-access policy.'), '필요한 Google 권한이 없어요: classroom.announcements.readonly. 다시 연결하고 해당 권한을 허용하세요. 이미 허용했다면 학교의 앱 접근 정책을 확인하세요.');
     assert.equal(t('Unknown teacher title'), 'Unknown teacher title');
     assert.equal(t('30 of 90 minutes scheduled'), '총 90분 중 30분 계획됨');
     assert.equal(document.documentElement.lang, 'ko');

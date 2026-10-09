@@ -63,6 +63,8 @@ The interface opens in Korean by default. Use the language selector at the top o
 
 Google setup instructions are available in [한국어](google-setup-ko.html) and [English](google-setup.html). OAuth identifiers, scope URLs, and environment variable names stay unchanged in both guides.
 
+If Google consent succeeds but the connection fails, reconnect to request fresh consent. The app accepts documented broader grants that cover its read-only operations and reports the specific missing scope identifiers when access is incomplete. A missing scope report is separate from an API-disabled or school-policy error returned when loading data. Do not share access tokens or client secrets when reporting an error; the displayed permission names are sufficient.
+
 ## Source layout
 
 - `src/model.js`: pure recurrence, date, conflict, layout, and sample-data logic.

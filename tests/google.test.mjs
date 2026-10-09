@@ -86,8 +86,8 @@ test('a failed later page rejects the entire import instead of returning partial
 });
 test('partial Google consent is rejected', async () => {
   const previous = globalThis.google;
-  globalThis.google = { accounts: { oauth2: { hasGrantedAllScopes: () => false, initTokenClient: options => ({ requestAccessToken: () => options.callback({ access_token: 'test' }) }) } } };
-  try { await assert.rejects(new GoogleConnection().connect('calendar', '123-test.apps.googleusercontent.com'), /permissions were declined/); }
+  globalThis.google = { accounts: { oauth2: { initTokenClient: options => ({ requestAccessToken: () => options.callback({ access_token: 'test', expires_in: 3600, scope: 'openid email' }) }) } } };
+  try { await assert.rejects(new GoogleConnection().connect('calendar', '123-test.apps.googleusercontent.com'), /Missing Google permissions: calendar.calendarlist.readonly, calendar.events.readonly/); }
   finally { globalThis.google = previous; }
 });
 test('client configuration accepts only public client IDs', () => {
@@ -96,8 +96,7 @@ test('client configuration accepts only public client IDs', () => {
 test('one Google sign-in grants both services to the same verified account', async () => {
   const previous = globalThis.google; let requestedScope = '', popups = 0;
   globalThis.google = { accounts: { oauth2: {
-    hasGrantedAllScopes: (_response, ...scopes) => scopes.includes('https://www.googleapis.com/auth/calendar.events.readonly') && scopes.includes('https://www.googleapis.com/auth/classroom.coursework.me.readonly'),
-    initTokenClient: options => { requestedScope = options.scope; return { requestAccessToken: () => { popups++; options.callback({ access_token: 'fixture', expires_in: 3600 }); } }; },
+    initTokenClient: options => { requestedScope = options.scope; return { requestAccessToken: () => { popups++; options.callback({ access_token: 'fixture', expires_in: 3600, scope: options.scope }); } }; },
   } } };
   try {
     const api = new GoogleConnection({ fetcher: async () => ({ ok: true, json: async () => ({ sub: 'student-a', email: 'student@example.test' }) }) });
@@ -109,10 +108,10 @@ test('one Google sign-in grants both services to the same verified account', asy
 });
 test('declining combined permissions cannot establish a partially connected new account', async () => {
   const previous = globalThis.google;
-  globalThis.google = { accounts: { oauth2: { hasGrantedAllScopes: () => false, initTokenClient: options => ({ requestAccessToken: () => options.callback({ access_token: 'denied' }) }) } } };
+  globalThis.google = { accounts: { oauth2: { initTokenClient: options => ({ requestAccessToken: () => options.callback({ access_token: 'denied', expires_in: 3600, scope: 'openid email' }) }) } } };
   try {
     const api = new GoogleConnection();
-    await assert.rejects(api.connect('all', '123-fixture.apps.googleusercontent.com'), /both Calendar and Classroom/);
+    await assert.rejects(api.connect('all', '123-fixture.apps.googleusercontent.com'), /Missing Google permissions/);
     assert.equal(api.connected('calendar'), false); assert.equal(api.connected('classroom'), false);
   } finally { globalThis.google = previous; }
 });

@@ -1,6 +1,22 @@
 import { SCOPES } from './google-data.js';
 
 export const validClientId = value => /^\d+-[a-zA-Z0-9_-]+\.apps\.googleusercontent\.com$/.test(value);
+const AUTH = 'https://www.googleapis.com/auth/';
+// A prior grant may cover a requested read scope under a broader name.
+// Only accept alternatives that cover the same data (not owned/public/freebusy subsets).
+// Sources: Calendar and Classroom REST discovery documents, methods.list.scopes.
+const coveringScopes = {
+  'calendar.calendarlist.readonly': ['calendar.calendarlist', 'calendar.readonly', 'calendar'],
+  'calendar.events.readonly': ['calendar.events', 'calendar.readonly', 'calendar'],
+  'classroom.courses.readonly': ['classroom.courses'],
+  'classroom.coursework.me.readonly': ['classroom.coursework.me'],
+  'classroom.announcements.readonly': ['classroom.announcements'],
+  'classroom.courseworkmaterials.readonly': ['classroom.courseworkmaterials'],
+};
+export function missingGoogleScopes(response, required) {
+  const granted = new Set(typeof response?.scope === 'string' ? response.scope.trim().split(/\s+/) : []);
+  return required.filter(scope => ![scope, ...(coveringScopes[scope.slice(AUTH.length)] || []).map(value => AUTH + value)].some(value => granted.has(value)));
+}
 let libraryPromise;
 export function loadGoogleIdentity() {
   if (globalThis.google?.accounts?.oauth2) return Promise.resolve();
@@ -35,8 +51,15 @@ export class GoogleConnection {
         client_id: clientId, scope: ['openid', 'email', ...scopes].join(' '), include_granted_scopes: true,
         error_callback: error => reject(Error(error.type === 'popup_closed' ? 'Sign-in was cancelled. Your existing plans are unchanged.' : 'Google could not open sign-in. Allow popups for this website and try again.')),
         callback: async response => {
-          if (response.error) { reject(Error('Google access was not granted. Please connect again and allow the requested read access.')); return; }
-          if (!google.accounts.oauth2.hasGrantedAllScopes(response, ...scopes)) { reject(Error('Some required permissions were declined. Sign in again and allow read access to both Calendar and Classroom.')); return; }
+          if (response?.error) { reject(Error('Google access was not granted. Please connect again and allow the requested read access.')); return; }
+          if (!response?.access_token || !Number.isFinite(Number(response.expires_in)) || Number(response.expires_in) <= 60 || typeof response.scope !== 'string' || !response.scope.trim()) {
+            reject(Error('Google returned an incomplete sign-in response. Please reconnect.')); return;
+          }
+          const missing = missingGoogleScopes(response, scopes);
+          if (missing.length) {
+            // Only permission identifiers enter this error, never the token or account data.
+            reject(Error(`Missing Google permissions: ${missing.map(scope => scope.slice(AUTH.length)).join(', ')}. Reconnect and approve these permissions. If already approved, check your school’s app-access policy.`)); return;
+          }
           const session = { token: response.access_token, expires: this.now() + Math.max(0, Number(response.expires_in) - 60) * 1000 };
           try {
             const result = await this.fetcher('https://www.googleapis.com/oauth2/v3/userinfo', { headers: { Authorization: `Bearer ${session.token}` }, signal: AbortSignal.timeout(20000) });
@@ -50,7 +73,7 @@ export class GoogleConnection {
         },
       });
       // Must remain synchronous with the user's click to avoid popup blocking.
-      client.requestAccessToken({ prompt: 'select_account' });
+      client.requestAccessToken({ prompt: 'consent select_account' });
     });
   }
   async request(service, url) {

@@ -3,8 +3,7 @@
   const originalFetch = window.fetch.bind(window);
   window.__googleFixture = { status: 200, deleted: false, authorize: true };
   window.google = { accounts: { oauth2: {
-    hasGrantedAllScopes: () => window.__googleFixture.authorize,
-    initTokenClient: options => ({ requestAccessToken: () => { window.__googleFixture.signIns = (window.__googleFixture.signIns || 0) + 1; window.__googleFixture.scopes = options.scope; setTimeout(() => options.callback({ access_token: 'TEST_ONLY_NOT_A_REAL_TOKEN', expires_in: 3600 }), 0); } }),
+    initTokenClient: options => ({ requestAccessToken: () => { window.__googleFixture.signIns = (window.__googleFixture.signIns || 0) + 1; window.__googleFixture.scopes = options.scope; setTimeout(() => options.callback({ access_token: 'TEST_ONLY_NOT_A_REAL_TOKEN', expires_in: 3600, scope: window.__googleFixture.authorize ? options.scope.replace('https://www.googleapis.com/auth/calendar.calendarlist.readonly', 'https://www.googleapis.com/auth/calendar.readonly').replace('https://www.googleapis.com/auth/calendar.events.readonly', '') : 'openid email' }), 0); } }),
   } } };
   window.fetch = async (input, options) => {
     const url = new URL(String(input), location.href), f = window.__googleFixture;
