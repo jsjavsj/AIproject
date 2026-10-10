@@ -3,13 +3,14 @@
   const originalFetch = window.fetch.bind(window);
   window.__googleFixture = { status: 200, deleted: false, authorize: true };
   window.google = { accounts: { oauth2: {
-    initTokenClient: options => ({ requestAccessToken: () => { window.__googleFixture.signIns = (window.__googleFixture.signIns || 0) + 1; window.__googleFixture.scopes = options.scope; setTimeout(() => options.callback({ access_token: 'TEST_ONLY_NOT_A_REAL_TOKEN', expires_in: 3600, scope: window.__googleFixture.authorize ? options.scope.replace('https://www.googleapis.com/auth/calendar.calendarlist.readonly', 'https://www.googleapis.com/auth/calendar.readonly').replace('https://www.googleapis.com/auth/calendar.events.readonly', '') : 'openid email' }), 0); } }),
+    initTokenClient: options => ({ requestAccessToken: () => { window.__googleFixture.signIns = (window.__googleFixture.signIns || 0) + 1; window.__googleFixture.scopes = options.scope; let granted = options.scope.replace('https://www.googleapis.com/auth/calendar.calendarlist.readonly', 'https://www.googleapis.com/auth/calendar.readonly').replace('https://www.googleapis.com/auth/calendar.events.readonly', ''); if (window.__googleFixture.omitCoursework) granted = granted.replace('https://www.googleapis.com/auth/classroom.coursework.me.readonly', ''); setTimeout(() => options.callback({ access_token: 'TEST_ONLY_NOT_A_REAL_TOKEN', expires_in: 3600, scope: window.__googleFixture.authorize ? granted : 'openid email' }), 0); } }),
   } } };
   window.fetch = async (input, options) => {
     const url = new URL(String(input), location.href), f = window.__googleFixture;
     if (!['www.googleapis.com', 'classroom.googleapis.com'].includes(url.hostname)) return originalFetch(input, options);
     if (f.status !== 200) return new Response('{}', { status: f.status });
     if (f.failMaterials && url.pathname.endsWith('/courseWorkMaterials')) return new Response('{}', { status: 403 });
+    if (f.failCoursework && url.pathname.endsWith('/courseWork')) return new Response('{}', { status: 403 });
     let body;
     if (url.pathname.endsWith('/userinfo')) body = { sub: f.accountId || 'fixture-account', email: f.email || 'student@example.test' };
     else if (url.pathname.endsWith('/calendarList')) body = { items: [{ id: 'primary', summary: 'Fixture school', primary: true }] };

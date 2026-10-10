@@ -90,5 +90,18 @@
   click('[data-action="google-signout"]');
   assert(!document.querySelector('[data-source]'), 'Sign out did not disconnect both services');
   results.push('One sign-out disconnects Calendar and Classroom');
+  window.__googleFixture.omitCoursework = true;
+  window.__googleFixture.failCoursework = true;
+  click('[data-action="google-connect"]');
+  await waitFor(() => document.querySelector('[data-source="calendar"]') && document.querySelector('#editor').textContent.includes('Missing Google permissions'));
+  assert(!document.querySelector('[data-source="classroom"]'), 'Denied Classroom access must stay disconnected');
+  assert(document.querySelector('[data-action="google-connect"]').textContent.includes('Reconnect Google'), 'Partial connection must offer a reconnect action');
+  assert(!document.querySelector('.service-icon.calendar').closest('.connection-card').textContent.includes('Missing Google permissions'), 'Classroom permissions must not block Calendar');
+  results.push('Missing assignment permission leaves Calendar usable and Classroom disconnected');
+  window.__googleFixture.failCoursework = false;
+  click('[data-action="google-connect"]');
+  await waitFor(() => document.querySelector('[data-source="classroom"]'));
+  assert(!document.querySelector('#editor').textContent.includes('Missing Google permissions'), 'Successful API verification must clear the old permission error');
+  results.push('Actual coursework API success confirms access despite a missing scope name');
   return results;
 })()

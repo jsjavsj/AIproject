@@ -17,6 +17,7 @@ export function missingGoogleScopes(response, required) {
   const granted = new Set(typeof response?.scope === 'string' ? response.scope.trim().split(/\s+/) : []);
   return required.filter(scope => ![scope, ...(coveringScopes[scope.slice(AUTH.length)] || []).map(value => AUTH + value)].some(value => granted.has(value)));
 }
+const permissionMessage = missing => `Missing Google permissions: ${missing.map(scope => scope.slice(AUTH.length)).join(', ')}. Reconnect and approve these permissions. If already approved, check your school’s app-access policy.`;
 let libraryPromise;
 export function loadGoogleIdentity() {
   if (globalThis.google?.accounts?.oauth2) return Promise.resolve();
@@ -33,11 +34,13 @@ export function loadGoogleIdentity() {
 }
 export class GoogleConnection {
   constructor({ fetcher = globalThis.fetch.bind(globalThis), now = () => Date.now() } = {}) {
-    this.fetcher = fetcher; this.now = now; this.sessions = {};
+    this.fetcher = fetcher; this.now = now; this.sessions = {}; this.permissionErrors = {};
   }
   connected(service) { return !!this.sessions[service] && this.sessions[service].expires > this.now(); }
   account(service) { return this.connected(service) ? this.sessions[service].account : null; }
+  permissionError(service) { return this.permissionErrors[service] || ''; }
   disconnect(service) {
+    delete this.permissionErrors[service];
     const session = this.sessions[service];
     for (const [key, value] of Object.entries(this.sessions)) if (key === service || value === session) delete this.sessions[key];
   }
@@ -55,10 +58,11 @@ export class GoogleConnection {
           if (!response?.access_token || !Number.isFinite(Number(response.expires_in)) || Number(response.expires_in) <= 60 || typeof response.scope !== 'string' || !response.scope.trim()) {
             reject(Error('Google returned an incomplete sign-in response. Please reconnect.')); return;
           }
-          const missing = missingGoogleScopes(response, scopes);
-          if (missing.length) {
-            // Only permission identifiers enter this error, never the token or account data.
-            reject(Error(`Missing Google permissions: ${missing.map(scope => scope.slice(AUTH.length)).join(', ')}. Reconnect and approve these permissions. If already approved, check your school’s app-access policy.`)); return;
+          const missingByService = Object.fromEntries(services.map(key => [key, missingGoogleScopes(response, SCOPES[key])]));
+          const courseworkScope = AUTH + 'classroom.coursework.me.readonly';
+          const verifyCoursework = missingByService.classroom?.length === 1 && missingByService.classroom[0] === courseworkScope;
+          if (!services.some(key => !missingByService[key].length) && !verifyCoursework) {
+            reject(Error(permissionMessage(services.flatMap(key => missingByService[key])))); return;
           }
           const session = { token: response.access_token, expires: this.now() + Math.max(0, Number(response.expires_in) - 60) * 1000 };
           try {
@@ -67,7 +71,15 @@ export class GoogleConnection {
             const profile = await result.json();
             if (!profile.sub) throw Error('Google did not return an account identifier. Please reconnect.');
             session.account = { id: profile.sub, email: profile.email || 'Google account' };
-            for (const key of services) this.sessions[key] = session;
+            // Do not guess that similarly named scopes are interchangeable. The API
+            // is authoritative: only a successful read can confirm assignment access.
+            if (verifyCoursework && await this.verifyCourseworkAccess(session)) missingByService.classroom = [];
+            if (!services.some(key => !missingByService[key].length)) throw Error(permissionMessage(services.flatMap(key => missingByService[key])));
+            for (const key of services) {
+              delete this.sessions[key]; delete this.permissionErrors[key];
+              if (missingByService[key].length) this.permissionErrors[key] = permissionMessage(missingByService[key]);
+              else this.sessions[key] = session;
+            }
             resolve(session.account);
           } catch (error) { reject(error); }
         },
@@ -75,6 +87,17 @@ export class GoogleConnection {
       // Must remain synchronous with the user's click to avoid popup blocking.
       client.requestAccessToken({ prompt: 'consent select_account' });
     });
+  }
+  async verifyCourseworkAccess(session) {
+    const read = url => this.fetcher(url, { headers: { Authorization: `Bearer ${session.token}` }, signal: AbortSignal.timeout(10000) });
+    try {
+      const courses = await read('https://classroom.googleapis.com/v1/courses?studentId=me&courseStates=ACTIVE&pageSize=1&fields=courses(id)');
+      if (!courses.ok) return false;
+      const id = (await courses.json()).courses?.[0]?.id;
+      if (!id) return false; // No course is not evidence of permission to read assignments.
+      const work = await read(`https://classroom.googleapis.com/v1/courses/${encodeURIComponent(id)}/courseWork?pageSize=1&courseWorkStates=PUBLISHED&fields=courseWork(id)`);
+      return work.ok;
+    } catch { return false; }
   }
   async request(service, url) {
     if (!this.connected(service)) throw Error('Your Google session expired. Use Connect to sign in again.');

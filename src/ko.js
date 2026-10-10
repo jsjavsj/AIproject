@@ -1,5 +1,6 @@
 // English interface copy is the stable lookup key. User and teacher content is never translated.
 export const korean = {
+  'Reconnect Google':'Google 다시 연결',
   'Google returned an incomplete sign-in response. Please reconnect.':'Google 로그인 응답이 완전하지 않아요. 다시 연결하세요.',
   'Task progress updated. Keep going!':'진행 상황을 저장했어요. 차근차근 계속해 봐요!',
   'Morning classes':'오전 수업','Math tutoring':'수학 과외','Room 204':'204호','Ms. Kim':'김 선생님','English academy':'영어 학원','Bright Academy':'브라이트 학원','Mr. Park':'박 선생님','Chemistry review':'화학 복습','Essay writing':'글쓰기 연습','Piano lesson':'피아노 수업','Music studio':'음악 연습실','A little time outside':'가볍게 산책하기','Calculus practice':'미적분 문제 풀이',

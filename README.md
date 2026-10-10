@@ -65,6 +65,8 @@ Google setup instructions are available in [한국어](google-setup-ko.html) and
 
 If Google consent succeeds but the connection fails, reconnect to request fresh consent. The app accepts documented broader grants that cover its read-only operations and reports the specific missing scope identifiers when access is incomplete. A missing scope report is separate from an API-disabled or school-policy error returned when loading data. Do not share access tokens or client secrets when reporting an error; the displayed permission names are sufficient.
 
+Calendar and Classroom permissions are evaluated independently. If only student coursework access is absent from Google's scope response, Daylight checks a minimal read of assignments from one active enrolled course. Only an API success confirms access; denial, no available course, or a network failure does not. Calendar can still connect when Classroom access is unavailable. For personal Gmail accounts, check Google Auth Platform → Data Access for `https://www.googleapis.com/auth/classroom.coursework.me.readonly`, save the configuration, and reconnect. The account must be enrolled as a student to import its coursework.
+
 ## Source layout
 
 - `src/model.js`: pure recurrence, date, conflict, layout, and sample-data logic.

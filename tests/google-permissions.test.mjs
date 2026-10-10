@@ -61,3 +61,50 @@ test('incomplete OAuth responses reject before fetching or establishing a sessio
     }
   } finally { globalThis.google = previous; }
 });
+
+async function withMissingCoursework(run) {
+  const previous = globalThis.google;
+  const scope = required.filter(value => value !== auth + 'classroom.coursework.me.readonly').join(' ');
+  globalThis.google = { accounts: { oauth2: { initTokenClient: options => ({ requestAccessToken: () => options.callback({ access_token: 'fixture-only', expires_in: 3600, scope }) }) } } };
+  try { await run(); } finally { globalThis.google = previous; }
+}
+test('missing assignment scope is accepted only after Google confirms an actual coursework read', async () => withMissingCoursework(async () => {
+  const requests = [];
+  const api = new GoogleConnection({ fetcher: async (url, options) => {
+    requests.push(url); assert.equal(options.headers.Authorization, 'Bearer fixture-only');
+    if (url.includes('/userinfo')) return { ok: true, json: async () => ({ sub: 'student-a' }) };
+    if (url.includes('/courses?')) return { ok: true, json: async () => ({ courses: [{ id: 'c/1' }] }) };
+    assert.ok(url.includes('/courses/c%2F1/courseWork?'));
+    assert.equal(new URL(url).searchParams.get('fields'), 'courseWork(id)');
+    return { ok: true, json: async () => ({}) };
+  } });
+  await api.connect('all', '123-fixture.apps.googleusercontent.com');
+  assert.equal(requests.length, 3);
+  assert.ok(api.connected('calendar')); assert.ok(api.connected('classroom'));
+  assert.equal(api.permissionError('classroom'), '');
+}));
+test('Google refusing assignments does not block Calendar or leave the old Classroom account connected', async () => withMissingCoursework(async () => {
+  const api = new GoogleConnection({ fetcher: async url => {
+    if (url.includes('/userinfo')) return { ok: true, json: async () => ({ sub: 'new-account' }) };
+    if (url.includes('/courses?')) return { ok: true, json: async () => ({ courses: [{ id: 'c1' }] }) };
+    return { ok: false, status: 403 };
+  } });
+  api.sessions.classroom = { token: 'old-fixture', expires: Date.now() + 100000, account: { id: 'old-account' } };
+  await api.connect('all', '123-fixture.apps.googleusercontent.com');
+  assert.equal(api.account('calendar').id, 'new-account');
+  assert.equal(api.connected('classroom'), false);
+  assert.match(api.permissionError('classroom'), /classroom.coursework.me.readonly/);
+  assert.equal(api.permissionError('calendar'), '');
+  api.disconnect('classroom'); assert.equal(api.permissionError('classroom'), '');
+}));
+test('empty courses and network failure cannot be mistaken for assignment authorization', async () => withMissingCoursework(async () => {
+  for (const fail of [false, true]) {
+    const api = new GoogleConnection({ fetcher: async url => {
+      if (url.includes('/userinfo')) return { ok: true, json: async () => ({ sub: 'student-a' }) };
+      if (fail) throw Error('offline');
+      return { ok: true, json: async () => ({ courses: [] }) };
+    } });
+    await api.connect('all', '123-fixture.apps.googleusercontent.com');
+    assert.ok(api.connected('calendar')); assert.equal(api.connected('classroom'), false);
+  }
+}));
