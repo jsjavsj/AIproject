@@ -18,6 +18,35 @@ export function missingGoogleScopes(response, required) {
   return required.filter(scope => ![scope, ...(coveringScopes[scope.slice(AUTH.length)] || []).map(value => AUTH + value)].some(value => granted.has(value)));
 }
 const permissionMessage = missing => `Missing Google permissions: ${missing.map(scope => scope.slice(AUTH.length)).join(', ')}. Reconnect and approve these permissions. If already approved, check your school’s app-access policy.`;
+async function deniedAccessError(service, response) {
+  let error;
+  try { error = (await response.json())?.error; } catch { /* Google may return a non-JSON error. */ }
+  const message = typeof error?.message === 'string' ? error.message : '';
+  const details = Array.isArray(error?.details) ? error.details : [];
+  const legacy = Array.isArray(error?.errors) ? error.errors : [];
+  // Display only bounded reason codes, never raw responses, URLs, or account data.
+  const reasons = [...details.map(item => item?.reason), ...legacy.map(item => item?.reason), message.match(/^@([A-Za-z][A-Za-z0-9_]{0,79}) /)?.[1]]
+    .filter(value => typeof value === 'string' && /^[A-Za-z][A-Za-z0-9_]{0,79}$/.test(value));
+  let reason = reasons[0] || 'HTTP_403';
+  let guidance = 'Google denied access to this data. Check that the connected account can open it in Google, then reconnect. Share this error code if it continues.';
+  const matches = values => values.find(value => reasons.includes(value));
+  let matched;
+  if ((matched = matches(['SERVICE_DISABLED', 'accessNotConfigured'])) || /has not been used in project .+ before or it is disabled/i.test(message)) {
+    reason = matched || 'SERVICE_DISABLED';
+    guidance = 'Enable this API in Google Cloud Console → APIs & Services → Library, in the same project as your OAuth client ID. Wait a few minutes, then retry.';
+  } else if ((matched = matches(['ACCESS_TOKEN_SCOPE_INSUFFICIENT', 'insufficientPermissions'])) || /insufficient authentication scopes/i.test(message)) {
+    reason = matched || 'ACCESS_TOKEN_SCOPE_INSUFFICIENT';
+    guidance = 'Google did not grant the read permission needed for this request. Reconnect Google and approve all requested permissions. The website owner should check Google Auth Platform → Data Access.';
+  } else if ((matched = matches(['RATE_LIMIT_EXCEEDED', 'QUOTA_EXCEEDED', 'rateLimitExceeded', 'userRateLimitExceeded', 'quotaExceeded', 'dailyLimitExceeded']))) {
+    reason = matched;
+    guidance = 'Google has reached a request limit. Try again later. If it continues, the website owner should check this API’s quotas in Google Cloud Console.';
+  } else if ((matched = matches(['ClassroomApiDisabled', 'ClassroomDisabled', 'domainPolicy']))) {
+    reason = matched;
+    guidance = 'Google reports that access is disabled for this account or its organization. Open this Google service with the same account to check access; for a managed account, contact its administrator.';
+  }
+  const name = service === 'calendar' ? 'Google Calendar API' : 'Google Classroom API';
+  return Error(`${name}: ${guidance} [${reason}]`);
+}
 let libraryPromise;
 export function loadGoogleIdentity() {
   if (globalThis.google?.accounts?.oauth2) return Promise.resolve();
@@ -73,11 +102,12 @@ export class GoogleConnection {
             session.account = { id: profile.sub, email: profile.email || 'Google account' };
             // Do not guess that similarly named scopes are interchangeable. The API
             // is authoritative: only a successful read can confirm assignment access.
-            if (verifyCoursework && await this.verifyCourseworkAccess(session)) missingByService.classroom = [];
-            if (!services.some(key => !missingByService[key].length)) throw Error(permissionMessage(services.flatMap(key => missingByService[key])));
+            const courseworkAccess = verifyCoursework ? await this.verifyCourseworkAccess(session) : null;
+            if (courseworkAccess?.allowed) missingByService.classroom = [];
+            if (!services.some(key => !missingByService[key].length)) throw Error(courseworkAccess?.error || permissionMessage(services.flatMap(key => missingByService[key])));
             for (const key of services) {
               delete this.sessions[key]; delete this.permissionErrors[key];
-              if (missingByService[key].length) this.permissionErrors[key] = permissionMessage(missingByService[key]);
+              if (missingByService[key].length) this.permissionErrors[key] = (key === 'classroom' && courseworkAccess?.error) || permissionMessage(missingByService[key]);
               else this.sessions[key] = session;
             }
             resolve(session.account);
@@ -90,14 +120,15 @@ export class GoogleConnection {
   }
   async verifyCourseworkAccess(session) {
     const read = url => this.fetcher(url, { headers: { Authorization: `Bearer ${session.token}` }, signal: AbortSignal.timeout(10000) });
+    const denied = async response => ({ allowed: false, error: response.status === 403 ? (await deniedAccessError('classroom', response)).message : '' });
     try {
       const courses = await read('https://classroom.googleapis.com/v1/courses?studentId=me&courseStates=ACTIVE&pageSize=1&fields=courses(id)');
-      if (!courses.ok) return false;
+      if (!courses.ok) return denied(courses);
       const id = (await courses.json()).courses?.[0]?.id;
-      if (!id) return false; // No course is not evidence of permission to read assignments.
+      if (!id) return { allowed: false }; // No course is not evidence of permission to read assignments.
       const work = await read(`https://classroom.googleapis.com/v1/courses/${encodeURIComponent(id)}/courseWork?pageSize=1&courseWorkStates=PUBLISHED&fields=courseWork(id)`);
-      return work.ok;
-    } catch { return false; }
+      return work.ok ? { allowed: true } : denied(work);
+    } catch { return { allowed: false }; }
   }
   async request(service, url) {
     if (!this.connected(service)) throw Error('Your Google session expired. Use Connect to sign in again.');
@@ -107,7 +138,7 @@ export class GoogleConnection {
     catch { throw Error('Google could not be reached. Check your connection and try again. Existing imports are unchanged.'); }
     if (this.sessions[service] !== session) throw Error('The connection changed. Please try again.');
     if (response.status === 401) { this.disconnect(service); throw Error('Your Google session expired. Use Connect to sign in again.'); }
-    if (response.status === 403) throw Error('Google denied access. Check API enablement, consent permissions, and your school’s app-access policy.');
+    if (response.status === 403) throw await deniedAccessError(service, response);
     if (response.status === 429) throw Error('Google is receiving too many requests. Wait a moment, then try again.');
     if (!response.ok) throw Error(`Google returned an error (${response.status}). Existing imports are unchanged; try again later.`);
     return response.json();

@@ -1,5 +1,12 @@
 // English interface copy is the stable lookup key. User and teacher content is never translated.
 export const korean = {
+  'Google Calendar API': 'Google Calendar API',
+  'Google Classroom API': 'Google Classroom API',
+  'Google denied access to this data. Check that the connected account can open it in Google, then reconnect. Share this error code if it continues.': 'Google에서 이 데이터에 대한 접근을 거부했어요. 연결한 계정으로 Google에서 해당 데이터를 열 수 있는지 확인한 후 다시 연결하세요. 계속 실패하면 이 오류 코드를 알려 주세요.',
+  'Enable this API in Google Cloud Console → APIs & Services → Library, in the same project as your OAuth client ID. Wait a few minutes, then retry.': 'OAuth 클라이언트 ID를 만든 동일한 프로젝트의 Google Cloud Console → API 및 서비스 → 라이브러리에서 이 API를 사용 설정하세요. 몇 분 후 다시 시도하세요.',
+  'Google did not grant the read permission needed for this request. Reconnect Google and approve all requested permissions. The website owner should check Google Auth Platform → Data Access.': 'Google에서 이 요청에 필요한 읽기 권한을 허용하지 않았어요. Google에 다시 연결하고 요청한 권한을 모두 허용하세요. 웹사이트 운영자는 Google 인증 플랫폼 → 데이터 액세스 설정을 확인하세요.',
+  'Google has reached a request limit. Try again later. If it continues, the website owner should check this API’s quotas in Google Cloud Console.': 'Google API 요청 한도에 도달했어요. 나중에 다시 시도하세요. 계속 실패하면 웹사이트 운영자가 Google Cloud Console에서 이 API의 할당량을 확인해야 해요.',
+  'Google reports that access is disabled for this account or its organization. Open this Google service with the same account to check access; for a managed account, contact its administrator.': 'Google에서 이 계정 또는 소속 조직의 접근이 차단되었다고 응답했어요. 같은 계정으로 해당 Google 서비스를 직접 열어 확인하세요. 조직에서 관리하는 계정이라면 관리자에게 문의하세요.',
   'Reconnect Google':'Google 다시 연결',
   'Google returned an incomplete sign-in response. Please reconnect.':'Google 로그인 응답이 완전하지 않아요. 다시 연결하세요.',
   'Task progress updated. Keep going!':'진행 상황을 저장했어요. 차근차근 계속해 봐요!',

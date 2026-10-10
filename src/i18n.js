@@ -15,6 +15,7 @@ export function updateLanguageDocument() {
   document.title = language === 'ko' ? 'Daylight — 나의 학생 플래너' : 'Daylight — Your student planner';
 }
 const patterns = [
+  [/^(Google Calendar API|Google Classroom API): (.+) \[([A-Za-z0-9_]+)\]$/, (_, service, message, reason) => `${t(service)}: ${t(message)} [${reason}]`],
   [/^Missing Google permissions: (.+)\. Reconnect and approve these permissions\. If already approved, check your school’s app-access policy\.$/, '필요한 Google 권한이 없어요: $1. 다시 연결하고 해당 권한을 허용하세요. 이미 허용했다면 학교의 앱 접근 정책을 확인하세요.'],
   [/^\/ (\d+) tasks complete$/, '/ $1개 완료'], [/^(.+) · Browser-local storage$/, '$1 · 현재 브라우저에 저장'],
   [/^Add event on (.+) at (.+)$/, '$1 $2에 일정 추가'], [/^Open (.+)$/, '$1 열기'],

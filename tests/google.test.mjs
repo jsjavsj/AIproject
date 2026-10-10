@@ -76,7 +76,7 @@ test('expired sessions fail before any network request', async () => {
 test('401 clears session; 403 and quota errors produce actionable messages', async () => {
   const unauthorized = connection(async () => ({ status: 401, ok: false }));
   await assert.rejects(unauthorized.listCalendars(), /expired/); assert.equal(unauthorized.connected('calendar'), false);
-  await assert.rejects(connection(async () => ({ status: 403, ok: false })).listCalendars(), /school/);
+  await assert.rejects(connection(async () => ({ status: 403, ok: false })).listCalendars(), /Google Calendar API: Google denied access.*HTTP_403/);
   await assert.rejects(connection(async () => ({ status: 429, ok: false })).listCalendars(), /Wait/);
 });
 test('a failed later page rejects the entire import instead of returning partial data', async () => {

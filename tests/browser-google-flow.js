@@ -65,8 +65,10 @@
   assert(!localStorage.getItem('daylight-planner-v1').includes('TEST_ONLY_NOT_A_REAL_TOKEN'), 'OAuth token was persisted');
   results.push('Classroom assignments and deadlines, preserved personal completion, no persisted token');
   const beforeFailure = JSON.stringify(read().events); window.__googleFixture.status = 403;
+  window.__googleFixture.errorBody = { error: { details: [{ reason: 'SERVICE_DISABLED' }] } };
   click('[data-action="google-sync"][data-service="calendar"]');
-  await waitFor(() => document.querySelector('#editor').textContent.includes('Google denied access'));
+  await waitFor(() => document.querySelector('#editor').textContent.includes('[SERVICE_DISABLED]'));
+  assert(document.querySelector('#editor').textContent.includes('same project as your OAuth client ID'), 'Disabled API must explain which project to update');
   assert(JSON.stringify(read().events) === beforeFailure, 'Failed sync removed existing events');
   results.push('Failed sync leaves existing data intact and displays an actionable error');
   window.__googleFixture.status = 200; window.__googleFixture.deleted = true;
@@ -93,15 +95,15 @@
   window.__googleFixture.omitCoursework = true;
   window.__googleFixture.failCoursework = true;
   click('[data-action="google-connect"]');
-  await waitFor(() => document.querySelector('[data-source="calendar"]') && document.querySelector('#editor').textContent.includes('Missing Google permissions'));
+  await waitFor(() => document.querySelector('[data-source="calendar"]') && document.querySelector('#editor').textContent.includes('[ACCESS_TOKEN_SCOPE_INSUFFICIENT]'));
   assert(!document.querySelector('[data-source="classroom"]'), 'Denied Classroom access must stay disconnected');
   assert(document.querySelector('[data-action="google-connect"]').textContent.includes('Reconnect Google'), 'Partial connection must offer a reconnect action');
-  assert(!document.querySelector('.service-icon.calendar').closest('.connection-card').textContent.includes('Missing Google permissions'), 'Classroom permissions must not block Calendar');
+  assert(!document.querySelector('.service-icon.calendar').closest('.connection-card').textContent.includes('[ACCESS_TOKEN_SCOPE_INSUFFICIENT]'), 'Classroom permissions must not block Calendar');
   results.push('Missing assignment permission leaves Calendar usable and Classroom disconnected');
   window.__googleFixture.failCoursework = false;
   click('[data-action="google-connect"]');
   await waitFor(() => document.querySelector('[data-source="classroom"]'));
-  assert(!document.querySelector('#editor').textContent.includes('Missing Google permissions'), 'Successful API verification must clear the old permission error');
+  assert(!document.querySelector('#editor').textContent.includes('[ACCESS_TOKEN_SCOPE_INSUFFICIENT]'), 'Successful API verification must clear the old permission error');
   results.push('Actual coursework API success confirms access despite a missing scope name');
   return results;
 })()

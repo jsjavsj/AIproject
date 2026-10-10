@@ -8,9 +8,9 @@
   window.fetch = async (input, options) => {
     const url = new URL(String(input), location.href), f = window.__googleFixture;
     if (!['www.googleapis.com', 'classroom.googleapis.com'].includes(url.hostname)) return originalFetch(input, options);
-    if (f.status !== 200) return new Response('{}', { status: f.status });
+    if (f.status !== 200) return new Response(JSON.stringify(f.errorBody || {}), { status: f.status });
     if (f.failMaterials && url.pathname.endsWith('/courseWorkMaterials')) return new Response('{}', { status: 403 });
-    if (f.failCoursework && url.pathname.endsWith('/courseWork')) return new Response('{}', { status: 403 });
+    if (f.failCoursework && url.pathname.endsWith('/courseWork')) return new Response(JSON.stringify({ error: { details: [{ reason: 'ACCESS_TOKEN_SCOPE_INSUFFICIENT' }] } }), { status: 403 });
     let body;
     if (url.pathname.endsWith('/userinfo')) body = { sub: f.accountId || 'fixture-account', email: f.email || 'student@example.test' };
     else if (url.pathname.endsWith('/calendarList')) body = { items: [{ id: 'primary', summary: 'Fixture school', primary: true }] };

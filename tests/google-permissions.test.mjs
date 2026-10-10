@@ -93,7 +93,7 @@ test('Google refusing assignments does not block Calendar or leave the old Class
   await api.connect('all', '123-fixture.apps.googleusercontent.com');
   assert.equal(api.account('calendar').id, 'new-account');
   assert.equal(api.connected('classroom'), false);
-  assert.match(api.permissionError('classroom'), /classroom.coursework.me.readonly/);
+  assert.match(api.permissionError('classroom'), /Google Classroom API: Google denied access.*HTTP_403/);
   assert.equal(api.permissionError('calendar'), '');
   api.disconnect('classroom'); assert.equal(api.permissionError('classroom'), '');
 }));
